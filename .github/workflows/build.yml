@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,21 +14,19 @@ jobs:
 
     strategy:
       fail-fast: false
+
       matrix:
         include:
-          # Linux
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             archive: tar.gz
             binary: fusion
 
-          # macOS Intel
           - os: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
             binary: fusion
 
-          # Windows
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             archive: zip
@@ -51,13 +48,15 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       # Linux / macOS
-      - name: Package Unix binary
+      - name: Package Unix
         if: matrix.archive == 'tar.gz'
         shell: bash
         run: |
           mkdir -p package
 
-          cp target/${{ matrix.target }}/release/${{ matrix.binary }} package/
+          cp \
+            target/${{ matrix.target }}/release/${{ matrix.binary }} \
+            package/${{ matrix.binary }}
 
           tar -czf \
             fusion-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz \
@@ -65,7 +64,7 @@ jobs:
             ${{ matrix.binary }}
 
       # Windows
-      - name: Package Windows binary
+      - name: Package Windows
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
@@ -82,13 +81,14 @@ jobs:
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-          name: fusion-${{ matrix.target }}
+          name: package-${{ matrix.target }}
           path: |
             fusion-*.tar.gz
             fusion-*.zip
+          if-no-files-found: error
 
   release:
-    name: Create GitHub Release
+    name: Create Release
 
     needs: build
 
@@ -98,12 +98,21 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@v4
         with:
+          pattern: package-*
           path: release
+          merge-multiple: true
 
-      - name: Create Release
+      - name: List release files
+        run: |
+          echo "Release files:"
+          find release -type f -maxdepth 2 -print
+
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release/**/*.tar.gz
-            release/**/*.zip
+          tag_name: ${{ github.ref_name }}
+          name: Fusion Framework ${{ github.ref_name }}
           generate_release_notes: true
+          files: |
+            release/*.tar.gz
+            release/*.zip
