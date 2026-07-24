@@ -2,62 +2,108 @@ name: Build and Release
 
 on:
   push:
-    branches: [main]
-    tags: ['*']
-  pull_request:
-    branches: [main]
-  release:
-    types: [published]
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build-and-release:
+  build:
+    name: Build ${{ matrix.target }}
+
     strategy:
       fail-fast: false
       matrix:
         include:
+          # Linux
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact: fusion
+            archive: tar.gz
+            binary: fusion
+
+          # macOS Intel
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact: fusion
+            archive: tar.gz
+            binary: fusion
+
+          # Windows
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: fusion.exe
+            archive: zip
+            binary: fusion.exe
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Install target
+      - name: Add target
         run: rustup target add ${{ matrix.target }}
 
-      - name: Build release
+      - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Upload artifact
+      # Linux / macOS
+      - name: Package Unix binary
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          mkdir -p package
+
+          cp target/${{ matrix.target }}/release/${{ matrix.binary }} package/
+
+          tar -czf \
+            fusion-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz \
+            -C package \
+            ${{ matrix.binary }}
+
+      # Windows
+      - name: Package Windows binary
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package
+
+          Copy-Item `
+            "target/${{ matrix.target }}/release/${{ matrix.binary }}" `
+            "package/${{ matrix.binary }}"
+
+          Compress-Archive `
+            -Path "package/${{ matrix.binary }}" `
+            -DestinationPath "fusion-${env:GITHUB_REF_NAME}-${{ matrix.target }}.zip"
+
+      - name: Upload package
         uses: actions/upload-artifact@v4
         with:
           name: fusion-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
+          path: |
+            fusion-*.tar.gz
+            fusion-*.zip
 
   release:
-    needs: build-and-release
+    name: Create GitHub Release
+
+    needs: build
+
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all artifacts
+      - name: Download packages
         uses: actions/download-artifact@v4
+        with:
+          path: release
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            fusion-*/fusion
-            fusion-*/fusion.exe
+            release/**/*.tar.gz
+            release/**/*.zip
+          generate_release_notes: true
