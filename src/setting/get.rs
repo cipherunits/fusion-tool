@@ -21,3 +21,12 @@ pub fn language() -> std::string::String {
     return existing_config.fusionframework.language;
 }
 
+pub fn version() -> std::string::String {
+    let config_path = get_toml();
+    let existing_content = fs::read_to_string(&config_path).unwrap();
+    let existing_config: config::Config = toml::from_str(&existing_content).unwrap();
+    return existing_config.fusionframework.version;
+}
+
+
+
