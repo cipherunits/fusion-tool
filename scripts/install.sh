@@ -1,82 +1,80 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 set -e
 
 REPO="cipherunits/fusion-tool"
 
+VERSION="${FUSION_VERSION:-v1.0.1}"
+
 echo "Installing fusion-tool..."
+echo "Version: ${VERSION}"
 
 OS="$(uname -s)"
+ARCH="$(uname -m)"
 
 case "$OS" in
-    Linux*)
-        SUFFIX="x86_64-unknown-linux-gnu"
-        INSTALL_DIR="$HOME/.local/bin"
+    Linux)
+        TARGET="x86_64-unknown-linux-gnu"
         ;;
-    Darwin*)
-        SUFFIX="x86_64-apple-darwin"
-        INSTALL_DIR="/usr/local/bin"
+
+    Darwin)
+        if [ "$ARCH" = "x86_64" ]; then
+            TARGET="x86_64-apple-darwin"
+        elif [ "$ARCH" = "arm64" ]; then
+            echo "ARM64 macOS is not supported yet."
+            exit 1
+        else
+            echo "Unsupported macOS architecture: $ARCH"
+            exit 1
+        fi
         ;;
+
     *)
-        echo "Unsupported OS: $OS"
+        echo "Unsupported operating system: $OS"
         exit 1
         ;;
 esac
 
-BINARY_NAME="fusion"
+ARCHIVE="fusion-${VERSION}-${TARGET}.tar.gz"
 
-VERSION="${1:-latest}"
+URL="https://github.com/${REPO}/releases/download/${VERSION}/${ARCHIVE}"
 
-if [ "$VERSION" = "latest" ]; then
-    TAG=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"//;s/".*//')
-    if [ -z "$TAG" ]; then
-        echo "Error: No releases found for ${REPO}."
-        echo "Visit https://github.com/${REPO}/releases to create one."
-        exit 1
-    fi
-    VERSION="$TAG"
+TMP_DIR="$(mktemp -d)"
+
+echo "Downloading ${ARCHIVE}..."
+
+if ! curl -fL "$URL" -o "${TMP_DIR}/${ARCHIVE}"; then
+    echo
+    echo "Error: Failed to download fusion-tool ${VERSION}."
+    echo
+    echo "Make sure the release exists:"
+    echo "https://github.com/${REPO}/releases/tag/${VERSION}"
+    exit 1
 fi
 
-URL="https://github.com/${REPO}/releases/download/${VERSION}/fusion-${SUFFIX}"
+echo "Extracting..."
+
+tar -xzf "${TMP_DIR}/${ARCHIVE}" -C "${TMP_DIR}"
+
+INSTALL_DIR="${HOME}/.local/bin"
 
 mkdir -p "$INSTALL_DIR"
 
-echo "Downloading fusion-tool ${VERSION}..."
+mv "${TMP_DIR}/fusion" "${INSTALL_DIR}/fusion"
 
-DOWNLOAD_OK=true
+chmod +x "${INSTALL_DIR}/fusion"
 
-if command -v curl &>/dev/null; then
-    HTTP_CODE=$(curl -fsSL -w "%{http_code}" -o "${INSTALL_DIR}/${BINARY_NAME}" "$URL" 2>/dev/null) || DOWNLOAD_OK=false
-elif command -v wget &>/dev/null; then
-    wget -q "$URL" -O "${INSTALL_DIR}/${BINARY_NAME}" || DOWNLOAD_OK=false
-else
-    echo "Error: Neither curl nor wget is available."
-    exit 1
+echo
+echo "✔ fusion-tool installed successfully!"
+echo
+
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+    echo "Add this directory to your PATH:"
+    echo
+    echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+    echo
 fi
 
-if [ "$DOWNLOAD_OK" = false ] || [ ! -f "${INSTALL_DIR}/${BINARY_NAME}" ] || [ ! -s "${INSTALL_DIR}/${BINARY_NAME}" ]; then
-    rm -f "${INSTALL_DIR}/${BINARY_NAME}" 2>/dev/null || true
-    echo ""
-    echo "Error: Failed to download fusion-tool ${VERSION}."
-    echo "The binary for this version may not be available yet."
-    echo ""
-    echo "Make sure the release exists and has assets uploaded at:"
-    echo "  https://github.com/${REPO}/releases/tag/${VERSION}"
-    echo ""
-    echo "Alternatively, install from source:"
-    echo "  git clone https://github.com/${REPO}.git"
-    echo "  cd fusion-tool && cargo install --path ."
-    exit 1
-fi
-
-chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
-
-echo ""
-echo "✔ fusion-tool ${VERSION} installed successfully!"
-echo "  Location: ${INSTALL_DIR}/${BINARY_NAME}"
-echo ""
-
-if [[ ":${PATH}:" != *":${INSTALL_DIR}:"* ]]; then
-    echo "WARNING: ${INSTALL_DIR} is not in your PATH."
-    echo "Add this to your ~/.bashrc or ~/.zshrc:"
-    echo "  export PATH=\"\${PATH}:${INSTALL_DIR}\""
-fi
+echo "Run:"
+echo
+echo "  fusion --help"
