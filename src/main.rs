@@ -4,12 +4,19 @@ mod setting;
 use anyhow::Result;
 use clap::Parser;
 
+use command::{init, Commands};
+
 fn main() -> Result<()> {
     let cli = command::Cli::parse();
 
     match cli.command {
-        command::Commands::Init { directory } => {
-            command::init(directory)?;
+        Commands::Init {
+            directory,
+            lang,
+            name,
+            description,
+        } => {
+            init(directory, lang, name, description)?;
         }
     }
 

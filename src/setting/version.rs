@@ -8,7 +8,7 @@ pub fn check_version_on_system() {
     println!();
     println!("{}", style("Fusion Framework Configuration").cyan().bold());
     println!();
-    println!("  Framework version: {}", style(fw_version).yellow());
+    println!("  Framework version: {}", style(fw_version.unwrap()).yellow());
     println!(
         "  Tool version:      {}",
         style(FUSION_TOOL_VERSION).yellow()

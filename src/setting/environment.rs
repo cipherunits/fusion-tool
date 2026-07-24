@@ -1,9 +1,13 @@
+use crate::setting::{config, get};
+use console::style;
 use std::fs;
 use std::path::Path;
-use console::style;
-use crate::setting::{config, get};
 
-pub fn environment_file(env: &str, config: &str, target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub fn environment_file(
+    env: &str,
+    config: &str,
+    target_dir: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     let content = format!(
         r#"{{
     "env": "{}",
@@ -39,7 +43,7 @@ pub fn stage(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn git(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let ext = get::extension();
+    let ext = get::extension().unwrap();
     let git_content = if ext == config::Language::Python.extension() {
         r#"
 # Byte-compiled / optimized / DLL files
@@ -161,9 +165,12 @@ package-lock.json
         fs::write(&gitignore_path, git_content)?;
         println!(
             "{}",
-            style(format!("✔ {} created successfully", gitignore_path.display()))
-                .green()
-                .bold()
+            style(format!(
+                "✔ {} created successfully",
+                gitignore_path.display()
+            ))
+            .green()
+            .bold()
         );
     }
     Ok(())

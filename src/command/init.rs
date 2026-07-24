@@ -1,15 +1,12 @@
 use crate::setting::{
     config, environment, get, version, Language, FUSION_FRAMEWORK_VERSION, FUSION_TOOL_VERSION,
 };
+
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use console::style;
 use dialoguer::{Input, Select};
-use std::{
-    env,
-    fs::{self},
-    path::PathBuf,
-};
+use std::{env, fs, path::PathBuf};
 
 use toml;
 
@@ -30,18 +27,39 @@ pub enum Commands {
     Init {
         /// Optional project directory
         directory: Option<String>,
+
+        /// Programming language
+        #[arg(long)]
+        lang: Option<String>,
+
+        /// Project name
+        #[arg(long)]
+        name: Option<String>,
+
+        /// Project description
+        #[arg(long)]
+        description: Option<String>,
     },
 }
 
-pub fn init(directory: Option<String>) -> Result<()> {
+pub fn init(
+    directory: Option<String>,
+    lang: Option<String>,
+    name: Option<String>,
+    description: Option<String>,
+) -> Result<()> {
     println!();
     println!(
         "{}",
-        style("Welcome to Fusion Framework!\n   MADE BY‌‌ CIPHER UNIT")
+        style("Welcome to Fusion Framework!\n   MADE BY CIPHER UNIT")
             .cyan()
             .bold()
     );
     println!();
+
+    // -----------------------------------------
+    // Target Directory
+    // -----------------------------------------
 
     let target_dir = match directory {
         Some(directory) => {
@@ -59,22 +77,38 @@ pub fn init(directory: Option<String>) -> Result<()> {
         None => env::current_dir().context("Could not determine current directory")?,
     };
 
-    let languages = vec!["Python", "TypeScript (soon)", "ASP.NET Core (soon)"];
+    // -----------------------------------------
+    // Language
+    // -----------------------------------------
 
-    let selection = Select::new()
-        .with_prompt("Select your language")
-        .items(&languages)
-        .default(0)
-        .interact()?;
+    let language = match lang {
+        // Non-interactive mode
+        Some(lang) => parse_language(&lang)?,
 
-    let language = match selection {
-        0 => Language::Python,
-        1 => Language::TypeScript,
-        2 => Language::AspNetCore,
-        _ => unreachable!(),
+        // Interactive mode
+        None => {
+            let languages = vec!["Python", "TypeScript (soon)", "ASP.NET Core (soon)"];
+
+            let selection = Select::new()
+                .with_prompt("Select your language")
+                .items(&languages)
+                .default(0)
+                .interact()?;
+
+            match selection {
+                0 => Language::Python,
+                1 => Language::TypeScript,
+                2 => Language::AspNetCore,
+                _ => unreachable!(),
+            }
+        }
     };
 
     println!();
+
+    // -----------------------------------------
+    // Project Name
+    // -----------------------------------------
 
     let default_name = target_dir
         .file_name()
@@ -82,20 +116,36 @@ pub fn init(directory: Option<String>) -> Result<()> {
         .unwrap_or("fusion-project")
         .to_string();
 
-    let project_name: String = Input::new()
-        .with_prompt("Project name")
-        .default(default_name)
-        .interact_text()?;
+    let project_name = match name {
+        Some(name) => name,
 
-    let description: String = Input::new()
-        .with_prompt("Project description")
-        .default(String::from("A Fusion Framework project"))
-        .interact_text()?;
+        None => Input::new()
+            .with_prompt("Project name")
+            .default(default_name)
+            .interact_text()?,
+    };
+
+    // -----------------------------------------
+    // Description
+    // -----------------------------------------
+
+    let project_description = match description {
+        Some(description) => description,
+
+        None => Input::new()
+            .with_prompt("Project description")
+            .default(String::from("A Fusion Framework project"))
+            .interact_text()?,
+    };
+
+    // -----------------------------------------
+    // Config
+    // -----------------------------------------
 
     let config = config::Config {
         project: config::ProjectConfig {
             name: project_name,
-            description,
+            description: project_description,
         },
 
         fusionframework: config::FrameworkConfig {
@@ -113,11 +163,17 @@ pub fn init(directory: Option<String>) -> Result<()> {
 
     let config_path = target_dir.join(get::get_toml());
 
+    // -----------------------------------------
+    // Existing Project
+    // -----------------------------------------
+
     if config_path.exists() {
         let existing_content = fs::read_to_string(&config_path)?;
+
         let existing_config: config::Config = toml::from_str(&existing_content)?;
 
         println!();
+
         println!(
             "{}",
             style(format!(
@@ -127,15 +183,19 @@ pub fn init(directory: Option<String>) -> Result<()> {
             .red()
             .bold()
         );
+
         println!(
             "  Current version in toml: {}",
             style(&existing_config.fusionframework.version).yellow()
         );
+
         println!("  Tool version: {}", style(FUSION_TOOL_VERSION).yellow());
+
         println!(
-            "  language: {}",
+            "  Language: {}",
             style(existing_config.fusionframework.language).yellow()
         );
+
         println!();
 
         version::check_version_on_system();
@@ -143,21 +203,33 @@ pub fn init(directory: Option<String>) -> Result<()> {
         return Ok(());
     }
 
+    // -----------------------------------------
+    // Create Files
+    // -----------------------------------------
+
     fs::write(&config_path, config_content)?;
 
     environment::prod(&target_dir).expect("Failed to create prod config");
+
     environment::stage(&target_dir).expect("Failed to create stage config");
+
     environment::dev(&target_dir).expect("Failed to create dev config");
 
     environment::git(&target_dir).expect("Failed to create .gitignore");
 
+    // -----------------------------------------
+    // Success
+    // -----------------------------------------
+
     println!();
+
     println!(
         "{}",
         style("✔ Project created successfully!").green().bold()
     );
 
     println!();
+
     println!("  Language: {}", style(language.name()).yellow());
 
     println!("  Config: {}", style(config_path.display()).yellow());
@@ -165,4 +237,20 @@ pub fn init(directory: Option<String>) -> Result<()> {
     println!();
 
     Ok(())
+}
+
+/// Convert CLI language input into a Fusion Language
+fn parse_language(value: &str) -> Result<Language> {
+    match value.to_lowercase().as_str() {
+        "python" | "py" => Ok(Language::Python),
+
+        "typescript" | "ts" => Ok(Language::TypeScript),
+
+        "aspnet" | "aspnetcore" | "asp.net" | "asp.net-core" => Ok(Language::AspNetCore),
+
+        _ => bail!(
+            "Unsupported language '{}'. Available languages: python, typescript, aspnetcore",
+            value
+        ),
+    }
 }
