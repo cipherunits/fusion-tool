@@ -1,7 +1,5 @@
 {
-  "env": "dev",
-  "config": {
-    "port": 8080
-  },
-  "command": {}
+    "env": "dev",
+    "config": { "port": 8080 },
+    "commands": {}
 }

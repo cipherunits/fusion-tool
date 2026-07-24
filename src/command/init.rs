@@ -1,4 +1,6 @@
-use crate::setting::*;
+use crate::setting::{
+    config, environment, get, version, Language, FUSION_FRAMEWORK_VERSION, FUSION_TOOL_VERSION,
+};
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use console::style;
@@ -99,11 +101,11 @@ pub fn init(directory: Option<String>) -> Result<()> {
         fusionframework: config::FrameworkConfig {
             language: language.name().to_string(),
             extension: language.extension().to_string(),
-            version: config::FUSION_FRAMEWORK_VERSION.to_string(),
+            version: FUSION_FRAMEWORK_VERSION.to_string(),
         },
 
         tool: config::ToolConfig {
-            version: config::FUSION_TOOL_VERSION.to_string(),
+            version: FUSION_TOOL_VERSION.to_string(),
         },
     };
 
@@ -136,16 +138,18 @@ pub fn init(directory: Option<String>) -> Result<()> {
         );
         println!();
 
+        version::check_version_on_system();
+
         return Ok(());
     }
 
     fs::write(&config_path, config_content)?;
 
-    environment::prod().unwrap();
-    environment::stage().unwrap();
-    environment::dev().unwrap();
+    environment::prod(&target_dir).expect("Failed to create prod config");
+    environment::stage(&target_dir).expect("Failed to create stage config");
+    environment::dev(&target_dir).expect("Failed to create dev config");
 
-    environment::git().unwrap();
+    environment::git(&target_dir).expect("Failed to create .gitignore");
 
     println!();
     println!(

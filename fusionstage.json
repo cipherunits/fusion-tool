@@ -1,7 +1,5 @@
 {
-  "env": "stage",
-  "config": {
-    "port": 1010
-  },
-  "command": {}
+    "env": "stage",
+    "config": { "port": 1010 },
+    "commands": {}
 }

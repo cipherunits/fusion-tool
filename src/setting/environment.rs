@@ -1,99 +1,51 @@
-use console::style;
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::fs;
-
+use std::path::Path;
+use console::style;
 use crate::setting::{config, get};
 
-#[derive(Serialize, Deserialize, Debug)]
-struct ProjectConfig {
-    env: String,
-    config: Config,
-    command: serde_json::Value,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Config {
-    port: u16,
-}
-
-pub fn dev() -> Result<(), Box<dyn std::error::Error>> {
-    let project = ProjectConfig {
-        env: "dev".to_string(),
-
-        config: Config { port: 8080 },
-
-        command: json!({}),
-    };
-
-    let json = serde_json::to_string_pretty(&project)?;
-
-    fs::write("fusiondev.json", json)?;
-
+pub fn environment_file(env: &str, config: &str, target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let content = format!(
+        r#"{{
+    "env": "{}",
+    "config": {},
+    "commands": {{}}
+}}"#,
+        env, config
+    );
+    let filename = target_dir.join(format!("fusion{}.json", env));
+    fs::write(&filename, content)?;
     println!(
         "{}",
-        style("✔ fusiondev.json created successfully!")
+        style(format!("✔ {} created successfully!", filename.display()))
             .green()
             .bold()
     );
-
-    Ok(())
-}
-pub fn prod() -> Result<(), Box<dyn std::error::Error>> {
-    let project = ProjectConfig {
-        env: "prod".to_string(),
-
-        config: Config { port: 9090 },
-
-        command: json!({}),
-    };
-
-    let json = serde_json::to_string_pretty(&project)?;
-
-    fs::write("fusionprod.json", json)?;
-    println!(
-        "{}",
-        style("✔ fusionprod.json created successfully!")
-            .green()
-            .bold()
-    );
-
     Ok(())
 }
 
-pub fn stage() -> Result<(), Box<dyn std::error::Error>> {
-    let project = ProjectConfig {
-        env: "stage".to_string(),
-
-        config: Config { port: 1010 },
-
-        command: json!({}),
-    };
-
-    let json = serde_json::to_string_pretty(&project)?;
-
-    fs::write("fusionstage.json", json)?;
-
-    println!(
-        "{}",
-        style("✔ fusionstage.json created successfully!")
-            .green()
-            .bold()
-    );
-
+pub fn dev(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    environment_file("dev", r#"{ "port": 8080 }"#, target_dir)?;
     Ok(())
 }
 
-pub fn git() -> Result<(), Box<dyn std::error::Error>> {
-    let mut git_content = String::from("");
-    if get::extension() == config::Language::Python.extension() {
-        git_content = r#"
-        
+pub fn prod(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    environment_file("prod", r#"{ "port": 9090 }"#, target_dir)?;
+    Ok(())
+}
+
+pub fn stage(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    environment_file("stage", r#"{ "port": 1010 }"#, target_dir)?;
+    Ok(())
+}
+
+pub fn git(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let ext = get::extension();
+    let git_content = if ext == config::Language::Python.extension() {
+        r#"
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
-
 
 # C extensions
 *.so
@@ -132,9 +84,8 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json"#
-.to_owned();
-    } else if get::extension() == config::Language::TypeScript.extension() {
-        git_content = r#"
+    } else if ext == config::Language::TypeScript.extension() {
+        r#"
 node_modules/
 .node_modules/
 built/*
@@ -148,8 +99,8 @@ test-args.txt
 tests/baselines/local/*
 tests/baselines/local.old/*
 tests/services/baselines/local/*
-tests/baselines/prototyping/local/*
-tests/baselines/rwc/*
+tests/baselines/local.old/*
+tests/baselines/reference/*
 tests/baselines/reference/projectOutput/*
 tests/baselines/local/projectOutput/*
 tests/baselines/reference/testresults.tap
@@ -201,13 +152,19 @@ package-lock.json
 .eslintcache
 *v8.log
 /lib/"#
-.to_owned();
-    }
+    } else {
+        ""
+    };
 
-    fs::write(".gitignore", &git_content)?;
-    println!(
-        "{}",
-        style("✔ .gitignore created successfully").green().bold()
-    );
+    if !git_content.is_empty() {
+        let gitignore_path = target_dir.join(".gitignore");
+        fs::write(&gitignore_path, git_content)?;
+        println!(
+            "{}",
+            style(format!("✔ {} created successfully", gitignore_path.display()))
+                .green()
+                .bold()
+        );
+    }
     Ok(())
 }

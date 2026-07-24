@@ -1,7 +1,5 @@
 {
-  "env": "prod",
-  "config": {
-    "port": 9090
-  },
-  "command": {}
+    "env": "prod",
+    "config": { "port": 9090 },
+    "commands": {}
 }
