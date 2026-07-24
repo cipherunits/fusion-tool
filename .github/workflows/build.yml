@@ -31,6 +31,9 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Install target
+        run: rustup target add ${{ matrix.target }}
+
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
 
