@@ -257,10 +257,10 @@ cargo test
 push a matching tag. CI refuses to build a tag that disagrees with `Cargo.toml`:
 
 ```bash
-# bump version = "1.0.3" in Cargo.toml first
-git commit -am "release v1.0.3"
-git tag v1.0.3
-git push origin main && git push origin v1.0.3
+# bump version = "1.0.4" in Cargo.toml first
+git commit -am "release v1.0.4"
+git tag v1.0.4
+git push origin main && git push origin v1.0.4
 ```
 
 This is the version of the tool only. The framework version that ends up in a
