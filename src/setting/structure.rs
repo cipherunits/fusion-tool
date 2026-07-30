@@ -29,8 +29,8 @@ ENV = os.getenv("FUSION_ENV", "dev")
 
 
 def load_config(env: str = ENV) -> dict:
-    """Read the config block of fusion<env>.json in the project root."""
-    config_file = BASE_DIR / f"fusion{env}.json"
+    """Read the config block of fusion.<env>.json in the project root."""
+    config_file = BASE_DIR / f"fusion.{env}.json"
 
     if not config_file.exists():
         return {}

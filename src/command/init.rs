@@ -177,13 +177,13 @@ pub fn init(
 
     fs::write(&config_path, config_content)?;
 
-    environment::prod(&target_dir).expect("Failed to create prod config");
+    environment::prod(&target_dir, &language)?;
 
-    environment::stage(&target_dir).expect("Failed to create stage config");
+    environment::stage(&target_dir, &language)?;
 
-    environment::dev(&target_dir).expect("Failed to create dev config");
+    environment::dev(&target_dir, &language)?;
 
-    environment::git(&target_dir, &language).expect("Failed to create .gitignore");
+    environment::git(&target_dir, &language)?;
 
     structure::create(&target_dir, &language, &config.project.name)?;
 

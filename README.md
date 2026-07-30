@@ -121,6 +121,33 @@ fusion init --lang typescript --name my-app --description "A TypeScript app"
 fusion init ./my-projects/test-app --lang python --name test
 ```
 
+### Project Commands
+
+Commands are declared per environment in the `commands` block of
+`fusion.<env>.json`, so each project defines its own. Run one by name:
+
+```bash
+fusion command run               # dev, the default environment
+fusion command run --stage
+fusion command run:stage         # same thing, shorter
+fusion command run --prod
+fusion command run --env test    # any environment you created
+```
+
+Leave the name out to see what an environment declares:
+
+```bash
+fusion command --stage
+```
+
+The command runs in the project root through your shell (`sh -c` on Linux and
+macOS, `cmd /C` on Windows), with `FUSION_ENV` set to the chosen environment so
+that `core/settings` loads the matching config. Its exit code becomes the exit
+code of `fusion`, which keeps it usable in scripts and CI.
+
+Without a flag or a `:env` suffix, the environment comes from `FUSION_ENV` if it
+is set, and falls back to `dev`.
+
 ### Update
 
 ```bash
@@ -146,6 +173,7 @@ fusion --version
 ```bash
 fusion --help
 fusion init --help
+fusion command --help
 ```
 
 ## Project Structure
@@ -160,23 +188,43 @@ Running `fusion init` creates:
 │   └── modules/             # Application modules
 ├── main.py                  # Entry point
 ├── fusion-framework.toml    # Project configuration
-├── fusiondev.json           # Development environment config
-├── fusionprod.json          # Production environment config
-├── fusionstage.json         # Staging environment config
+├── fusion.dev.json          # Development environment
+├── fusion.prod.json         # Production environment
+├── fusion.stage.json        # Staging environment
 └── .gitignore               # Git ignore rules (language-specific)
 ```
 
 `main` and `core/settings` follow the extension of the selected language, so a
 TypeScript project gets `main.ts` and `core/settings.ts` instead.
 
-`core/settings.py` reads the `config` block of `fusion<env>.json` from the
+`core/settings.py` reads the `config` block of `fusion.<env>.json` from the
 project root, where `<env>` comes from the `FUSION_ENV` environment variable and
 defaults to `dev`:
 
 ```bash
-python main.py              # uses fusiondev.json
-FUSION_ENV=prod python main.py   # uses fusionprod.json
+python main.py                   # uses fusion.dev.json
+FUSION_ENV=prod python main.py   # uses fusion.prod.json
 ```
+
+## Environment Files
+
+Each environment is one `fusion.<env>.json` in the project root. Add as many as
+you like: a `fusion.test.json` becomes the `test` environment, no configuration
+needed anywhere else.
+
+```json
+{
+  "env": "stage",
+  "config": { "port": 1010 },
+  "commands": {
+    "run": "docker compose up",
+    "stop": "docker compose down"
+  }
+}
+```
+
+`config` is yours to shape and is what `core/settings` reads. `commands` holds
+project commands that `fusion command` runs.
 
 ## Development
 

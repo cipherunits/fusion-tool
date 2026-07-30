@@ -1,51 +1,106 @@
 use crate::setting::config;
+use anyhow::{Context, Result};
 use console::style;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-pub fn environment_file(
-    env: &str,
-    config: &str,
-    target_dir: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let content = format!(
-        r#"{{
-    "env": "{}",
-    "config": {},
-    "commands": {{}}
-}}"#,
-        env, config
-    );
-    let filename = target_dir.join(format!("fusion{}.json", env));
-    fs::write(&filename, content)?;
+/// Contents of a fusion.<env>.json file
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Environment {
+    pub env: String,
+
+    pub config: serde_json::Value,
+
+    /// Commands the project author declares, run by `fusion command <name>`
+    #[serde(default)]
+    pub commands: BTreeMap<String, String>,
+}
+
+pub fn file_name(env: &str) -> String {
+    format!("fusion.{}.json", env)
+}
+
+pub fn file_path(project_root: &Path, env: &str) -> PathBuf {
+    project_root.join(file_name(env))
+}
+
+/// Read the environment file of a project
+pub fn read(project_root: &Path, env: &str) -> Result<Environment> {
+    let path = file_path(project_root, env);
+
+    let content = fs::read_to_string(&path).with_context(|| {
+        format!(
+            "Could not read {}. Run `fusion init` first, or pick another environment.",
+            path.display()
+        )
+    })?;
+
+    serde_json::from_str(&content).with_context(|| format!("Could not parse {}", path.display()))
+}
+
+fn write(target_dir: &Path, environment: &Environment) -> Result<()> {
+    let path = file_path(target_dir, &environment.env);
+
+    let content = serde_json::to_string_pretty(environment)?;
+
+    fs::write(&path, format!("{}\n", content))
+        .with_context(|| format!("Could not create {}", path.display()))?;
+
     println!(
         "{}",
-        style(format!("✔ {} created successfully!", filename.display()))
+        style(format!("✔ {} created successfully!", path.display()))
             .green()
             .bold()
     );
+
     Ok(())
 }
 
-pub fn dev(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    environment_file("dev", r#"{ "port": 8080 }"#, target_dir)?;
-    Ok(())
+/// Commands a new project starts with, as an editable example
+fn commands(language: &config::Language) -> BTreeMap<String, String> {
+    let run = match language {
+        config::Language::Python => "python main.py",
+
+        config::Language::TypeScript => "npx tsx main.ts",
+
+        config::Language::AspNetCore => "dotnet run",
+    };
+
+    BTreeMap::from([("run".to_string(), run.to_string())])
 }
 
-pub fn prod(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    environment_file("prod", r#"{ "port": 9090 }"#, target_dir)?;
-    Ok(())
-}
-
-pub fn stage(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    environment_file("stage", r#"{ "port": 1010 }"#, target_dir)?;
-    Ok(())
-}
-
-pub fn git(
+fn environment_file(
     target_dir: &Path,
+    env: &str,
+    port: u16,
     language: &config::Language,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
+    write(
+        target_dir,
+        &Environment {
+            env: env.to_string(),
+            config: json!({ "port": port }),
+            commands: commands(language),
+        },
+    )
+}
+
+pub fn dev(target_dir: &Path, language: &config::Language) -> Result<()> {
+    environment_file(target_dir, "dev", 8080, language)
+}
+
+pub fn prod(target_dir: &Path, language: &config::Language) -> Result<()> {
+    environment_file(target_dir, "prod", 9090, language)
+}
+
+pub fn stage(target_dir: &Path, language: &config::Language) -> Result<()> {
+    environment_file(target_dir, "stage", 1010, language)
+}
+
+pub fn git(target_dir: &Path, language: &config::Language) -> Result<()> {
     let git_content = match language {
         config::Language::Python => {
             r#"
