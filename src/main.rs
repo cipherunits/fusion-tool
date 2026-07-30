@@ -4,7 +4,7 @@ mod setting;
 use anyhow::Result;
 use clap::Parser;
 
-use command::{init, Commands};
+use command::{init, update, Commands};
 
 fn main() -> Result<()> {
     let cli = command::Cli::parse();
@@ -17,6 +17,10 @@ fn main() -> Result<()> {
             description,
         } => {
             init(directory, lang, name, description)?;
+        }
+
+        Commands::Update => {
+            update()?;
         }
     }
 

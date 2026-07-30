@@ -121,6 +121,20 @@ fusion init --lang typescript --name my-app --description "A TypeScript app"
 fusion init ./my-projects/test-app --lang python --name test
 ```
 
+### Update
+
+```bash
+fusion update
+```
+
+Checks the latest GitHub release and, if it is newer, downloads the build for
+your platform and replaces the running `fusion` binary in place. It works the
+same on Linux, macOS and Windows, keeps the current install location, and needs
+no reinstall or `PATH` change. Nothing happens if you are already up to date.
+
+If `fusion` was installed to a system-wide directory, run the update with the
+permissions needed to write there (for example `sudo fusion update`).
+
 ### Version
 
 ```bash

@@ -4,44 +4,11 @@ use crate::setting::{
 };
 
 use anyhow::{bail, Context, Result};
-use clap::{Parser, Subcommand};
 use console::style;
 use dialoguer::{Input, Select};
 use std::{env, fs, path::PathBuf};
 
 use toml;
-
-#[derive(Parser)]
-#[command(
-    name = "fusion",
-    version = FUSION_TOOL_VERSION,
-    about = "Fusion Framework CLI"
-)]
-pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
-}
-
-#[derive(Subcommand)]
-pub enum Commands {
-    /// Create a new Fusion Framework project
-    Init {
-        /// Optional project directory
-        directory: Option<String>,
-
-        /// Programming language
-        #[arg(long)]
-        lang: Option<String>,
-
-        /// Project name
-        #[arg(long)]
-        name: Option<String>,
-
-        /// Project description
-        #[arg(long)]
-        description: Option<String>,
-    },
-}
 
 pub fn init(
     directory: Option<String>,

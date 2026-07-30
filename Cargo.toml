@@ -1,17 +1,28 @@
 [package]
 name = "fusion-tool"
-version = "1.0.3"
+version = "1.1.0"
 edition = "2021"
 
 [[bin]]
 name = "fusion"
 path = "src/main.rs"
 
+# Keep the published binary small: it is downloaded on every install and update.
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4.6.4", features = ["derive"] }
 console = "0.15"
 dialoguer = "0.11"
+flate2 = "1.1.9"
+self-replace = "1.5.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0.151"
+tar = "0.4.46"
 toml = "0.8"
+ureq = "3.3.0"
+zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
