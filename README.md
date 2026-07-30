@@ -7,7 +7,7 @@ A CLI tool for creating and managing Fusion Framework projects. Supports both in
 ### Linux
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/cipherunits/fusion-tool/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cipherunits/fusion-tool/main/scripts/install.sh | bash
 ```
 
 Or install from source:
@@ -32,7 +32,50 @@ cd fusion-tool && cargo install --path .
 
 ### Windows
 
-Download the latest release from [GitHub Releases](https://github.com/cipherunits/fusion-tool/releases), extract `fusion.exe`, and run it.
+In PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/cipherunits/fusion-tool/main/scripts/install.ps1 | iex
+```
+
+This installs `fusion.exe` into `%LOCALAPPDATA%\Programs\fusion` and adds that
+directory to your user `PATH`. **Open a new terminal window afterwards**, then:
+
+```powershell
+fusion --help
+```
+
+To install somewhere else, set `FUSION_INSTALL_DIR` (and optionally
+`FUSION_VERSION`) before running the installer:
+
+```powershell
+$env:FUSION_INSTALL_DIR = "C:\tools\fusion"
+irm https://raw.githubusercontent.com/cipherunits/fusion-tool/main/scripts/install.ps1 | iex
+```
+
+#### Manual install
+
+Download the latest `.zip` from
+[GitHub Releases](https://github.com/cipherunits/fusion-tool/releases) and
+extract `fusion.exe` into a folder of your choice. Running it from another
+directory (for example `fusion` in `cmd`) only works once that folder is on your
+`PATH`:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+  "Path",
+  [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\tools\fusion",
+  "User"
+)
+```
+
+Or install from source:
+
+```powershell
+git clone https://github.com/cipherunits/fusion-tool.git
+cd fusion-tool
+cargo install --path .
+```
 
 ## Commands
 

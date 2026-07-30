@@ -4,9 +4,25 @@ set -e
 
 REPO="cipherunits/fusion-tool"
 
-VERSION="${FUSION_VERSION:-v1.0.1}"
-
 echo "Installing fusion-tool..."
+
+VERSION="${FUSION_VERSION:-}"
+
+if [ -z "$VERSION" ]; then
+    LATEST_JSON="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" || true)"
+
+    VERSION="$(printf '%s\n' "$LATEST_JSON" \
+        | grep '"tag_name"' \
+        | head -n 1 \
+        | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
+fi
+
+if [ -z "$VERSION" ]; then
+    echo "Error: Could not determine the latest version."
+    echo "Set FUSION_VERSION and retry, e.g. FUSION_VERSION=v1.0.2"
+    exit 1
+fi
+
 echo "Version: ${VERSION}"
 
 OS="$(uname -s)"

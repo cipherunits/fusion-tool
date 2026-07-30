@@ -47,6 +47,31 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
+      # macOS runners are arm64, so the x86_64 binary cannot be executed here.
+      - name: Smoke test binary
+        if: matrix.os != 'macos-latest'
+        shell: bash
+        run: target/${{ matrix.target }}/release/${{ matrix.binary }} --version
+
+      # A dynamic VCRUNTIME140.dll import makes the binary fail to start on a
+      # Windows machine without the Visual C++ Redistributable.
+      - name: Verify Windows binary is self-contained
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $exe = "target/${{ matrix.target }}/release/${{ matrix.binary }}"
+
+          $content = [Text.Encoding]::ASCII.GetString(
+            [IO.File]::ReadAllBytes($exe)
+          )
+
+          if ($content -match "VCRUNTIME140\.dll") {
+            Write-Error "$exe depends on VCRUNTIME140.dll; expected a static CRT."
+            exit 1
+          }
+
+          Write-Host "OK: no Visual C++ Redistributable dependency."
+
       # Linux / macOS
       - name: Package Unix
         if: matrix.archive == 'tar.gz'
