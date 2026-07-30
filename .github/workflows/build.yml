@@ -26,7 +26,11 @@ jobs:
 
           if [ "v${crate_version}" != "${GITHUB_REF_NAME}" ]; then
             echo "Tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${crate_version}."
-            echo "Bump the version in Cargo.toml before tagging."
+            echo
+            echo "Set the Cargo.toml version to ${GITHUB_REF_NAME#v}, commit, then move the tag:"
+            echo "  git commit -am 'release ${GITHUB_REF_NAME}'"
+            echo "  git tag -f ${GITHUB_REF_NAME}"
+            echo "  git push origin main && git push --force origin ${GITHUB_REF_NAME}"
             exit 1
           fi
 

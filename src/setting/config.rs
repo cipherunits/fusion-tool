@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub const FUSION_TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Version of the framework the generated projects target
-pub const FUSION_FRAMEWORK_VERSION: &str = "0.1.0";
+pub const FUSION_FRAMEWORK_VERSION: &str = "1.0.0";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {

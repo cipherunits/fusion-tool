@@ -195,9 +195,15 @@ cargo test
 push a matching tag. CI refuses to build a tag that disagrees with `Cargo.toml`:
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+# bump version = "1.0.3" in Cargo.toml first
+git commit -am "release v1.0.3"
+git tag v1.0.3
+git push origin main && git push origin v1.0.3
 ```
+
+This is the version of the tool only. The framework version that ends up in a
+generated `fusion-framework.toml` is `FUSION_FRAMEWORK_VERSION` in
+`src/setting/config.rs` and is bumped separately.
 
 ## License
 
