@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-pub const FUSION_TOOL_VERSION: &str = "0.1.0";
+/// Version of this CLI, kept in sync with Cargo.toml by the compiler
+pub const FUSION_TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Version of the framework the generated projects target
 pub const FUSION_FRAMEWORK_VERSION: &str = "0.1.0";
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -1,5 +1,6 @@
 use crate::setting::{
-    config, environment, get, version, Language, FUSION_FRAMEWORK_VERSION, FUSION_TOOL_VERSION,
+    config, environment, get, structure, version, Language, FUSION_FRAMEWORK_VERSION,
+    FUSION_TOOL_VERSION,
 };
 
 use anyhow::{bail, Context, Result};
@@ -198,7 +199,7 @@ pub fn init(
 
         println!();
 
-        version::check_version_on_system();
+        version::check_version_on_system(&target_dir)?;
 
         return Ok(());
     }
@@ -215,7 +216,9 @@ pub fn init(
 
     environment::dev(&target_dir).expect("Failed to create dev config");
 
-    environment::git(&target_dir).expect("Failed to create .gitignore");
+    environment::git(&target_dir, &language).expect("Failed to create .gitignore");
+
+    structure::create(&target_dir, &language, &config.project.name)?;
 
     // -----------------------------------------
     // Success

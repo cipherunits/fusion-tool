@@ -1,3 +1,7 @@
+// Accessors kept as the shared read API for upcoming commands, so not every
+// one of them has a caller yet.
+#![allow(dead_code)]
+
 use crate::setting::FUSION_FRAMEWORK_VERSION;
 use anyhow::{Context, Result};
 use std::{

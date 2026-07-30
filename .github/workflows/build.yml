@@ -9,8 +9,33 @@ permissions:
   contents: write
 
 jobs:
+  # `fusion --version` reports the Cargo.toml version, so a tag that does not
+  # match it would ship a binary reporting the wrong version.
+  version:
+    name: Check version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Tag must match Cargo.toml version
+        run: |
+          crate_version="$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[0].version')"
+
+          if [ "v${crate_version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${crate_version}."
+            echo "Bump the version in Cargo.toml before tagging."
+            exit 1
+          fi
+
+          echo "OK: ${GITHUB_REF_NAME} matches Cargo.toml."
+
   build:
     name: Build ${{ matrix.target }}
+
+    needs: version
 
     strategy:
       fail-fast: false

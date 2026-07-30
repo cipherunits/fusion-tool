@@ -86,10 +86,15 @@ fusion init
 ```
 
 You will be prompted for:
-1. Project directory (defaults to current directory)
-2. Programming language (Python, TypeScript, or ASP.NET Core)
-3. Project name
-4. Project description
+1. Programming language (Python, TypeScript, or ASP.NET Core)
+2. Project name
+3. Project description
+
+The project is created in the current directory unless you pass a directory:
+
+```bash
+fusion init my-app
+```
 
 ### Non-Interactive Mode
 
@@ -97,21 +102,23 @@ You will be prompted for:
 fusion init --lang python --name myproject --description "My awesome project"
 ```
 
-#### Available Flags for `fusion init`
+#### Available Arguments for `fusion init`
 
-| Flag | Type | Description | Required |
+| Argument | Type | Description | Required |
 |------|------|-------------|----------|
+| `[DIRECTORY]` | string | Target directory, created if missing (defaults to the current directory) | No |
 | `--lang` | string | `python`, `typescript`, `asp-core` | No |
 | `--name` | string | Project name | No |
 | `--description` | string | Project description | No |
-| `--directory` | string | Target directory | No |
+
+Any option you leave out is asked interactively.
 
 #### Examples
 
 ```bash
 fusion init --lang python --name my-app
 fusion init --lang typescript --name my-app --description "A TypeScript app"
-fusion init --lang python --name test --directory ./my-projects/test-app
+fusion init ./my-projects/test-app --lang python --name test
 ```
 
 ### Version
@@ -133,12 +140,28 @@ Running `fusion init` creates:
 
 ```
 <project-directory>/
+├── core/
+│   └── settings.py          # Project settings
+├── src/
+│   └── modules/             # Application modules
+├── main.py                  # Entry point
 ├── fusion-framework.toml    # Project configuration
 ├── fusiondev.json           # Development environment config
 ├── fusionprod.json          # Production environment config
 ├── fusionstage.json         # Staging environment config
-├── .gitignore               # Git ignore rules (language-specific)
-└── src/                     # Source directory
+└── .gitignore               # Git ignore rules (language-specific)
+```
+
+`main` and `core/settings` follow the extension of the selected language, so a
+TypeScript project gets `main.ts` and `core/settings.ts` instead.
+
+`core/settings.py` reads the `config` block of `fusion<env>.json` from the
+project root, where `<env>` comes from the `FUSION_ENV` environment variable and
+defaults to `dev`:
+
+```bash
+python main.py              # uses fusiondev.json
+FUSION_ENV=prod python main.py   # uses fusionprod.json
 ```
 
 ## Development
@@ -164,6 +187,16 @@ cargo run -- init
 
 ```bash
 cargo test
+```
+
+### Release
+
+`fusion --version` reports the `Cargo.toml` version, so bump it first and then
+push a matching tag. CI refuses to build a tag that disagrees with `Cargo.toml`:
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 ## License

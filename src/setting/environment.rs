@@ -1,4 +1,4 @@
-use crate::setting::{config, get};
+use crate::setting::config;
 use console::style;
 use std::fs;
 use std::path::Path;
@@ -42,10 +42,13 @@ pub fn stage(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn git(target_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let ext = get::extension().unwrap();
-    let git_content = if ext == config::Language::Python.extension() {
-        r#"
+pub fn git(
+    target_dir: &Path,
+    language: &config::Language,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let git_content = match language {
+        config::Language::Python => {
+            r#"
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -88,8 +91,10 @@ venv.bak/
 .mypy_cache/
 .dmypy.json
 dmypy.json"#
-    } else if ext == config::Language::TypeScript.extension() {
-        r#"
+        }
+
+        config::Language::TypeScript => {
+            r#"
 node_modules/
 .node_modules/
 built/*
@@ -156,8 +161,9 @@ package-lock.json
 .eslintcache
 *v8.log
 /lib/"#
-    } else {
-        ""
+        }
+
+        config::Language::AspNetCore => "",
     };
 
     if !git_content.is_empty() {
