@@ -6,6 +6,14 @@ use serde_json::json;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use uuid::Uuid;
+
+
+fn generate_uuid() -> String {
+    let id = Uuid::new_v4();
+    format!("fusion-framework-{id}")
+}
+
 
 /// Contents of a fusion.<env>.json file
 #[derive(Debug, Serialize, Deserialize)]
@@ -76,28 +84,29 @@ fn environment_file(
     target_dir: &Path,
     env: &str,
     port: u16,
+    secret_key: &str,
     language: &config::Language,
 ) -> Result<()> {
     write(
         target_dir,
         &Environment {
             env: env.to_string(),
-            config: json!({ "port": port }),
+            config: json!({ "port": port, "secret_key": secret_key }),
             commands: commands(language),
         },
     )
 }
 
 pub fn dev(target_dir: &Path, language: &config::Language) -> Result<()> {
-    environment_file(target_dir, "dev", 8080, language)
+    environment_file(target_dir, "dev", 8080, &generate_uuid(),language)
 }
 
 pub fn prod(target_dir: &Path, language: &config::Language) -> Result<()> {
-    environment_file(target_dir, "prod", 9090, language)
+    environment_file(target_dir, "prod", 9090, &generate_uuid(),language)
 }
 
 pub fn stage(target_dir: &Path, language: &config::Language) -> Result<()> {
-    environment_file(target_dir, "stage", 1010, language)
+    environment_file(target_dir, "stage", 1010, &generate_uuid(),language)
 }
 
 pub fn git(target_dir: &Path, language: &config::Language) -> Result<()> {

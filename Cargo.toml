@@ -26,3 +26,9 @@ tar = "0.4.46"
 toml = "0.8"
 ureq = "3.3.0"
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
+
+[dependencies.uuid]
+version = "1.24.0"
+features = [
+    "v4",
+]
