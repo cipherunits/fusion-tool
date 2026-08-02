@@ -17,29 +17,27 @@ if __name__ == "__main__":
     main()
 "#;
 
-const PYTHON_SETTINGS: &str = r#"import json
-import os
-from pathlib import Path
+const PYTHON_SETTINGS: &str = r#"
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-PROJECT_NAME = "__PROJECT_NAME__"
-
-ENV = os.getenv("FUSION_ENV", "dev")
-
-
-def load_config(env: str = ENV) -> dict:
-    """Read the config block of fusion.<env>.json in the project root."""
-    config_file = BASE_DIR / f"fusion.{env}.json"
-
-    if not config_file.exists():
-        return {}
-
-    with config_file.open(encoding="utf-8") as file:
-        return json.load(file).get("config", {})
+# Fusion Framework Settings
+# --------------------------------------------
+# This file contains the core configuration
+# for your application.
+#
+# License: MIT License
+# You are free to use, modify, and distribute.
 
 
-CONFIG = load_config()
+# variables or external config providers.
+from fusion_framework import settings
+
+
+# Never expose your secret key in public repositories
+SECRET_KEY = settings.get("secret_key")
+
+# Enable debug mode (DO NOT use True in production)
+DEBUG = settings.get("debug", defualt=False)
+
 "#;
 
 const TYPESCRIPT_MAIN: &str = r#"import { ENV, PROJECT_NAME } from "./core/settings";
@@ -51,9 +49,31 @@ function main(): void {
 main();
 "#;
 
-const TYPESCRIPT_SETTINGS: &str = r#"export const PROJECT_NAME = "__PROJECT_NAME__";
+const TYPESCRIPT_SETTINGS: &str = r#"
 
-export const ENV = process.env.FUSION_ENV ?? "dev";
+// ============================================
+// Fusion Framework Settings
+// --------------------------------------------
+// This file contains the core configuration
+// for your application.
+//
+// License: MIT License
+// You are free to use, modify, and distribute.
+// ============================================
+
+// variables or external config providers.
+const settings = require("fusion-framework");
+
+// Never expose your secret key in public repositories
+const SECRET_KEY = settings.get("secret_key");
+
+// Enable debug mode (DO NOT use true in production)
+const DEBUG = settings.get("debug", { default: false });
+
+module.exports = {
+  SECRET_KEY,
+  DEBUG,
+};
 "#;
 
 const CSHARP_MAIN: &str = r#"public static class Program
