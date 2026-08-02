@@ -86,27 +86,29 @@ fn environment_file(
     port: u16,
     secret_key: &str,
     language: &config::Language,
+    host: &str,
+    debug: bool,
 ) -> Result<()> {
     write(
         target_dir,
         &Environment {
             env: env.to_string(),
-            config: json!({ "port": port, "secret_key": secret_key }),
+            config: json!({ "port": port, "secret_key": secret_key, "host": host, "debug": debug }),
             commands: commands(language),
         },
     )
 }
 
 pub fn dev(target_dir: &Path, language: &config::Language) -> Result<()> {
-    environment_file(target_dir, "dev", 8080, &generate_uuid(),language)
+    environment_file(target_dir, "dev", 8080, &generate_uuid(),language, "127.0.0.1",true)
 }
 
 pub fn prod(target_dir: &Path, language: &config::Language) -> Result<()> {
-    environment_file(target_dir, "prod", 9090, &generate_uuid(),language)
+    environment_file(target_dir, "prod", 9090, &generate_uuid(),language, "HOST", false)
 }
 
 pub fn stage(target_dir: &Path, language: &config::Language) -> Result<()> {
-    environment_file(target_dir, "stage", 1010, &generate_uuid(),language)
+    environment_file(target_dir, "stage", 1010, &generate_uuid(),language, "HOST", false)
 }
 
 pub fn git(target_dir: &Path, language: &config::Language) -> Result<()> {
