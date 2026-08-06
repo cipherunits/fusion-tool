@@ -6,15 +6,27 @@ use std::path::Path;
 
 const PROJECT_NAME_PLACEHOLDER: &str = "__PROJECT_NAME__";
 
-const PYTHON_MAIN: &str = r#"from core.settings import CONFIG, ENV, PROJECT_NAME
+const PYTHON_MAIN: &str = r#"
+"""Entry point: import API classes, then start from settings."""
 
-
-def main() -> None:
-    print(f"{PROJECT_NAME} is running in {ENV} mode on port {CONFIG.get('port')}")
-
+import src.modules.products.products #registers @router classes
+from fusion_framework.app import run
 
 if __name__ == "__main__":
-    main()
+    run("settings")
+
+"#;
+
+const PYTHON_PRODUCTS: &str = r#"
+from fusion_frameworka.api import FusionBaseApi
+from fusion_framework.route import router
+
+@router("api/[module]/")
+class ProductModule:
+    """Product management module."""
+
+    def get(self):
+        return {"products_id": 12} 
 "#;
 
 const PYTHON_SETTINGS: &str = r#"
@@ -48,6 +60,16 @@ function main(): void {
 
 main();
 "#;
+
+const TYPESCRIPT_PRODUCTS: &str = r#"import { module } from "fusion-framework";
+
+@module
+class ProductModule {
+  name = "products";
+
+  register(): void {
+  }
+}"#;
 
 const TYPESCRIPT_SETTINGS: &str = r#"
 
@@ -87,6 +109,15 @@ const CSHARP_MAIN: &str = r#"public static class Program
 }
 "#;
 
+const CSHARP_PRODUCTS: &str = r#"public static class ProductModule
+{
+    public string Name => "products";
+
+    public void Register()
+    {
+    }
+}"#;
+
 const CSHARP_SETTINGS: &str = r#"public static class Settings
 {
     public const string ProjectName = "__PROJECT_NAME__";
@@ -97,7 +128,7 @@ const CSHARP_SETTINGS: &str = r#"public static class Settings
 "#;
 
 /// Directories every new project starts with. `src/modules` also creates `src`.
-const DIRECTORIES: [&str; 2] = ["core", "src/modules"];
+const DIRECTORIES: [&str; 3] = ["core", "src/modules", "src/modules/products"];
 
 /// Create the starting layout of a new project:
 ///
@@ -107,6 +138,8 @@ const DIRECTORIES: [&str; 2] = ["core", "src/modules"];
 /// ├── main.py
 /// └── src
 ///     └── modules
+///         └── products
+///             └── products.py
 /// ```
 pub fn create(target_dir: &Path, language: &Language, project_name: &str) -> Result<()> {
     for directory in DIRECTORIES {
@@ -118,7 +151,7 @@ pub fn create(target_dir: &Path, language: &Language, project_name: &str) -> Res
         report(&path);
     }
 
-    let (main_template, settings_template) = templates(language);
+    let (main_template, settings_template, _) = templates(language);
 
     let extension = language.extension();
 
@@ -134,17 +167,34 @@ pub fn create(target_dir: &Path, language: &Language, project_name: &str) -> Res
         &render(settings_template, project_name),
     )?;
 
+    let products_template = products_template(language);
+
+    write(
+        &target_dir
+            .join("src/modules/products")
+            .join(format!("products{}", extension)),
+        &render(products_template, project_name),
+    )?;
+
     Ok(())
 }
 
-/// Entry point and settings templates for a language
-fn templates(language: &Language) -> (&'static str, &'static str) {
+/// Entry point, settings, and products templates for a language
+fn templates(language: &Language) -> (&'static str, &'static str, &'static str) {
     match language {
-        Language::Python => (PYTHON_MAIN, PYTHON_SETTINGS),
+        Language::Python => (PYTHON_MAIN, PYTHON_SETTINGS, PYTHON_PRODUCTS),
 
-        Language::TypeScript => (TYPESCRIPT_MAIN, TYPESCRIPT_SETTINGS),
+        Language::TypeScript => (TYPESCRIPT_MAIN, TYPESCRIPT_SETTINGS, TYPESCRIPT_PRODUCTS),
 
-        Language::AspNetCore => (CSHARP_MAIN, CSHARP_SETTINGS),
+        Language::AspNetCore => (CSHARP_MAIN, CSHARP_SETTINGS, CSHARP_PRODUCTS),
+    }
+}
+
+fn products_template(language: &Language) -> &'static str {
+    match language {
+        Language::Python => PYTHON_PRODUCTS,
+        Language::TypeScript => TYPESCRIPT_PRODUCTS,
+        Language::AspNetCore => CSHARP_PRODUCTS,
     }
 }
 
@@ -185,10 +235,12 @@ mod tests {
         assert!(target_dir.join("main.py").is_file());
         assert!(target_dir.join("core/settings.py").is_file());
         assert!(target_dir.join("src/modules").is_dir());
+        assert!(target_dir.join("src/modules/products").is_dir());
+        assert!(target_dir.join("src/modules/products/products.py").is_file());
 
         let settings = fs::read_to_string(target_dir.join("core/settings.py")).unwrap();
 
-        assert!(settings.contains("PROJECT_NAME = \"my-app\""));
+        assert!(settings.contains("SECRET_KEY = settings.get(\"secret_key\")"));
         assert!(!settings.contains(PROJECT_NAME_PLACEHOLDER));
 
         fs::remove_dir_all(&target_dir).unwrap();

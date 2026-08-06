@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// Name of the Fusion Framework configuration file
+/// Get fuison config
 pub fn get_toml() -> PathBuf {
     PathBuf::from("fusion-framework.toml")
 }

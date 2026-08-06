@@ -9,6 +9,8 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 
+
+/// generate uuid only fot environments
 fn generate_uuid() -> String {
     let id = Uuid::new_v4();
     format!("fusion-framework-{id}")

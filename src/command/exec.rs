@@ -15,7 +15,7 @@ const SHELL: (&str, &str) = ("sh", "-c");
 /// Run a command declared in the `commands` block of an environment file.
 ///
 /// The environment can come from the command itself (`run:stage`) or from a
-/// flag (`--stage`, `--env stage`).
+/// flag (`--stage`, `-w-env stage`).
 pub fn exec(name: Option<String>, env: Option<String>) -> Result<()> {
     let project_root = get::get_project_root();
 
