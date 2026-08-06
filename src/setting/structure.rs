@@ -18,15 +18,28 @@ if __name__ == "__main__":
 "#;
 
 const PYTHON_PRODUCTS: &str = r#"
-from fusion_frameworka.api import FusionBaseApi
+
+from fusion_framework.api import FusionBaseApi
 from fusion_framework.route import router
 
 @router("api/[module]/")
-class ProductModule:
+class ProductModule(FusionBaseApi):
     """Product management module."""
 
     def get(self):
         return {"products_id": 12} 
+
+    def post(self):
+            return {"products_id": 12} 
+    
+    def delete(self):
+            return {"products_id": 12} 
+    
+
+    def patch(self):
+            return {"products_id": 12} 
+    
+        
 "#;
 
 const PYTHON_SETTINGS: &str = r#"
