@@ -232,7 +232,11 @@ venv.bak/
 # mypy
 .mypy_cache/
 .dmypy.json
-dmypy.json"#
+dmypy.json
+
+# Fusion modules vendored by `fusion add`
+.fusion/
+"#
         }
 
         config::Language::TypeScript => {

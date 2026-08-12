@@ -11,6 +11,19 @@ pub struct Config {
     pub project: ProjectConfig,
     pub fusionframework: FrameworkConfig,
     pub tool: ToolConfig,
+
+    /// Third-party modules installed with `fusion add`
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modules: Vec<InstalledModule>,
+}
+
+/// A module vendored into `.fusion/modules/<id>`
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub struct InstalledModule {
+    pub id: String,
+    pub source: String,
+    pub version: String,
+    pub path: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

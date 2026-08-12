@@ -27,7 +27,7 @@ mod setting;
 use anyhow::Result;
 use clap::Parser;
 
-use command::{exec, init, selected_env, update, Commands};
+use command::{add, exec, init, module_init, selected_env, update, Commands, ModuleCommands};
 
 fn main() -> Result<()> {
     let cli = command::Cli::parse();
@@ -61,13 +61,25 @@ fn main() -> Result<()> {
             exec(name, selected_env(env, dev, stage, prod))?;
         }
 
+        Commands::Module { command } => match command {
+            ModuleCommands::Init {
+                directory,
+                lang,
+                name,
+                description,
+            } => {
+                module_init(directory, lang, name, description)?;
+            }
+        },
+
+        Commands::Add { github } => {
+            add(github)?;
+        }
+
         // Update fusion tool with latest version
         Commands::Update => {
             update()?;
         }
-
-        // TODO: add module command here
-
     }
 
     Ok(())

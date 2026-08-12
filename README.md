@@ -148,6 +148,66 @@ code of `fusion`, which keeps it usable in scripts and CI.
 Without a flag or a `:env` suffix, the environment comes from `FUSION_ENV` if it
 is set, and falls back to `dev`.
 
+### Modules
+
+Fusion modules are **publishable library packages** (separate repos). Authors
+scaffold with `fusion module init`, push to GitHub, and apps install with
+`fusion add --github`. After install, import the package in your Fusion app
+like any other dependency — modules are not route/API plugins.
+
+#### Create a module package
+
+```bash
+fusion module init
+```
+
+You will be prompted for:
+
+1. Implementation language — Python, TypeScript, or Rust (Rust can target both hosts via PyO3 / N-API)
+2. Module name (id)
+3. Description
+4. Output directory (defaults to `fusion-<id>-mod`)
+
+Non-interactive:
+
+```bash
+fusion module init --lang python --name example --description "My first module"
+fusion module init --lang rust --name auth --description "Auth helpers" ./fusion-auth-mod
+```
+
+**Recommended package naming** (not required):
+
+| Host | Pattern | Example (`--name jwt`) |
+|------|---------|-------------------------|
+| Python | `fusion_<name>_mod` | `fusion_jwt_mod` → `from fusion_jwt_mod import ...` |
+| npm/TS | `fusion-<name>-mod` | `fusion-jwt-mod` → `import { ... } from "fusion-jwt-mod"` |
+
+Every package gets a `fusion.module.toml` manifest and a small example export
+(e.g. `hello()`). Replace that with your own library code.
+
+#### Add a module from GitHub
+
+From inside a Fusion project:
+
+```bash
+fusion add --github OWNER/MODULE_NAME
+fusion add --github OWNER/MODULE_NAME@v1.0.0
+fusion add --github https://github.com/OWNER/MODULE_NAME
+```
+
+This downloads the repo, validates `fusion.module.toml`, vendors it under
+`.fusion/modules/<id>/`, runs the declared build/install steps (`pip install -e .`,
+`maturin`, or `npm`), and records the module in `fusion-framework.toml` as
+`[[modules]]`. For TypeScript hosts it also links the package in `package.json`.
+
+Then import it:
+
+```python
+from fusion_example_mod import hello
+
+print(hello("world"))
+```
+
 ### Update
 
 ```bash
@@ -174,6 +234,8 @@ fusion --version
 fusion --help
 fusion init --help
 fusion command --help
+fusion module init --help
+fusion add --help
 ```
 
 ## Project Structure

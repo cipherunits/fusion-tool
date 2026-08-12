@@ -125,6 +125,8 @@ pub fn init(
         tool: config::ToolConfig {
             version: FUSION_TOOL_VERSION.to_string(),
         },
+
+        modules: vec![],
     };
 
     let config_content = toml::to_string_pretty(&config)?;
