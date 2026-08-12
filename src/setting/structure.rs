@@ -18,31 +18,42 @@ if __name__ == "__main__":
 "#;
 
 const PYTHON_PRODUCTS: &str = r#"
+# Fusion Framework
+# Docs:     https://fusion.cipherunit.xyz/
+# Desktop:  https://fusion.cipherunit.xyz/en/gui
+# CLI tool: https://github.com/cipherunits/fusion-tool
+
 
 from fusion_framework.api import FusionBaseApi
-from fusion_framework.route import router
+from fusion_framework.route import route
+from fusion_framework import status
 
-@router("api/[module]/")
+@route(
+      "api/[module]/",
+      tags=["swagger"],
+      desc="Fusion Framework Api",
+      version="v1",
+      deprecated=False
+      )
 class ProductModule(FusionBaseApi):
     """Product management module."""
 
     def get(self):
-        return {"products_id": 12} 
+        return self.response({"products_id": 12},status=status.HTTP_SUCCESS)
 
     def post(self):
-            return {"products_id": 12} 
+            return self.response({"products_id": 12},status=status.HTTP_201_CREATED)
     
     def delete(self):
-            return {"products_id": 12} 
+            return self.response({"products_id": 12},status=status.HTTP_204_NO_CONTENT)
     
-
     def patch(self):
-            return {"products_id": 12} 
-    
+            return self.response({"products_id": 12},status=status.HTTP_SUCCESS)
         
 "#;
 
 const PYTHON_SETTINGS: &str = r#"
+# Docs: https://fusion.cipherunit.xyz/
 
 # Fusion Framework Settings
 # --------------------------------------------
