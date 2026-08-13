@@ -55,7 +55,7 @@ pub fn init(
 
         // Interactive mode
         None => {
-            let languages = vec!["Python", "TypeScript (soon)", "ASP.NET Core (soon)"];
+            let languages = vec!["Python", "TypeScript / Node.js", "C#"];
 
             let selection = Select::new()
                 .with_prompt("Select your language")
@@ -216,12 +216,14 @@ fn parse_language(value: &str) -> Result<Language> {
     match value.to_lowercase().as_str() {
         "python" | "py" => Ok(Language::Python),
 
-        "typescript" | "ts" => Ok(Language::TypeScript),
+        "typescript" | "ts" | "node" | "nodejs" => Ok(Language::TypeScript),
 
-        "aspnet" | "aspnetcore" | "asp.net" | "asp.net-core" => Ok(Language::AspNetCore),
+        "csharp" | "cs" | "asp-core" | "aspnet" | "aspnetcore" | "asp.net" | "asp.net-core" => {
+            Ok(Language::AspNetCore)
+        }
 
         _ => bail!(
-            "Unsupported language '{}'. Available languages: python, typescript, aspnetcore",
+            "Unsupported language '{}'. Available: python, typescript, csharp (asp-core)",
             value
         ),
     }
