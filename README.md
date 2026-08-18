@@ -163,7 +163,7 @@ fusion module init
 
 You will be prompted for:
 
-1. Implementation language — Python, TypeScript, or Rust (Rust can target both hosts via PyO3 / N-API)
+1. Implementation language — Python, TypeScript, C#, or Rust (Rust can target all hosts via PyO3 / N-API / a C# class library)
 2. Module name (id)
 3. Description
 4. Output directory (defaults to `fusion-<id>-mod`)
@@ -172,6 +172,7 @@ Non-interactive:
 
 ```bash
 fusion module init --lang python --name example --description "My first module"
+fusion module init --lang csharp --name security --description "Security helpers"
 fusion module init --lang rust --name auth --description "Auth helpers" ./fusion-auth-mod
 ```
 
@@ -181,9 +182,10 @@ fusion module init --lang rust --name auth --description "Auth helpers" ./fusion
 |------|---------|-------------------------|
 | Python | `fusion_<name>_mod` | `fusion_jwt_mod` → `from fusion_jwt_mod import ...` |
 | npm/TS | `fusion-<name>-mod` | `fusion-jwt-mod` → `import { ... } from "fusion-jwt-mod"` |
+| C# | `Fusion<Name>Mod` | `FusionJwtMod` → `using FusionJwtMod;` |
 
 Every package gets a `fusion.module.toml` manifest and a small example export
-(e.g. `hello()`). Replace that with your own library code.
+(e.g. `hello()` / `Module.Hello()`). Replace that with your own library code.
 
 #### Add a module from GitHub
 
@@ -197,8 +199,9 @@ fusion add --github https://github.com/OWNER/MODULE_NAME
 
 This downloads the repo, validates `fusion.module.toml`, vendors it under
 `.fusion/modules/<id>/`, runs the declared build/install steps (`pip install -e .`,
-`maturin`, or `npm`), and records the module in `fusion-framework.toml` as
-`[[modules]]`. For TypeScript hosts it also links the package in `package.json`.
+`maturin`, `npm`, or `dotnet build`), and records the module in `fusion-framework.toml` as
+`[[modules]]`. TypeScript hosts get a `package.json` `file:` link; C# (`asp-core`)
+hosts get `dotnet add reference` to the vendored `.csproj`.
 
 Then import it:
 
@@ -206,6 +209,12 @@ Then import it:
 from fusion_example_mod import hello
 
 print(hello("world"))
+```
+
+```csharp
+using FusionExampleMod;
+
+Console.WriteLine(Module.Hello("world"));
 ```
 
 ### Update

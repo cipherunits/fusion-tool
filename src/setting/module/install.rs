@@ -33,9 +33,9 @@ pub fn install_module(spec: &GitHubSpec) -> Result<InstallResult> {
 
     let host_language = get::language_from(&project_root)?;
 
-    if host_language != "python" && host_language != "typescript" {
+    if host_language != "python" && host_language != "typescript" && host_language != "asp-core" {
         bail!(
-            "Host language '{}' cannot install Fusion modules yet. Use a Python or TypeScript project.",
+            "Host language '{}' cannot install Fusion modules. Use a Python, TypeScript, or C# (asp-core) project.",
             host_language
         );
     }
@@ -106,6 +106,10 @@ pub fn install_module(spec: &GitHubSpec) -> Result<InstallResult> {
         link_typescript_dependency(&project_root, &vendor_rel, &manifest)?;
     }
 
+    if host_language == "asp-core" {
+        link_csharp_dependency(&project_root, &vendor_abs, &manifest)?;
+    }
+
     upsert_project_module(
         &project_root,
         InstalledModule {
@@ -143,8 +147,30 @@ fn import_hint(manifest: &ModuleManifest, host_language: &str) -> String {
                 .unwrap_or_else(|| format!("fusion-{}-mod", manifest.module.id));
             format!("import {{ hello }} from \"{package}\"")
         }
+        "asp-core" | "csharp" => {
+            let package = manifest
+                .module
+                .entry
+                .csharp
+                .clone()
+                .unwrap_or_else(|| format!("Fusion{}Mod", pascal_id(&manifest.module.id)));
+            format!("using {package};\nConsole.WriteLine({package}.Module.Hello());")
+        }
         _ => String::new(),
     }
+}
+
+fn pascal_id(id: &str) -> String {
+    id.split('-')
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => format!("{}{}", first.to_ascii_uppercase(), chars.as_str()),
+                None => String::new(),
+            }
+        })
+        .collect()
 }
 
 fn find_manifest(root: &Path) -> Result<PathBuf> {
@@ -180,6 +206,13 @@ fn run_builds(module_root: &Path, manifest: &ModuleManifest, host_language: &str
             .clone()
             .into_iter()
             .collect(),
+        (ModuleImplLanguage::CSharp, "asp-core") => manifest
+            .module
+            .build
+            .csharp
+            .clone()
+            .into_iter()
+            .collect(),
         (ModuleImplLanguage::Rust, "python") => {
             let mut cmds = Vec::new();
             if let Some(rust) = &manifest.module.build.rust {
@@ -197,6 +230,16 @@ fn run_builds(module_root: &Path, manifest: &ModuleManifest, host_language: &str
             }
             if let Some(typescript) = &manifest.module.build.typescript {
                 cmds.push(typescript.clone());
+            }
+            cmds
+        }
+        (ModuleImplLanguage::Rust, "asp-core") => {
+            let mut cmds = Vec::new();
+            if let Some(rust) = &manifest.module.build.rust {
+                cmds.push(rust.clone());
+            }
+            if let Some(csharp) = &manifest.module.build.csharp {
+                cmds.push(csharp.clone());
             }
             cmds
         }
@@ -299,6 +342,113 @@ fn link_typescript_dependency(
     Ok(())
 }
 
+/// Add a ProjectReference from the host .csproj to the vendored module.
+fn link_csharp_dependency(
+    project_root: &Path,
+    vendor_abs: &Path,
+    manifest: &ModuleManifest,
+) -> Result<()> {
+    let package = manifest.module.entry.csharp.clone().unwrap_or_else(|| {
+        format!("Fusion{}Mod", pascal_id(&manifest.module.id))
+    });
+
+    let module_csproj = find_module_csproj(vendor_abs, &package)?;
+    let host_csproj = find_host_csproj(project_root)?;
+
+    let status = Command::new("dotnet")
+        .args([
+            "add",
+            host_csproj.to_str().unwrap_or_default(),
+            "reference",
+            module_csproj.to_str().unwrap_or_default(),
+        ])
+        .current_dir(project_root)
+        .status()
+        .context("Could not run `dotnet add reference`")?;
+
+    if !status.success() {
+        bail!(
+            "dotnet add reference failed (host {}, module {})",
+            host_csproj.display(),
+            module_csproj.display()
+        );
+    }
+
+    println!(
+        "{}",
+        style(format!(
+            "✔ Linked {} → {}",
+            host_csproj
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("app.csproj"),
+            module_csproj.display()
+        ))
+        .green()
+        .bold()
+    );
+
+    Ok(())
+}
+
+fn find_host_csproj(project_root: &Path) -> Result<PathBuf> {
+    let mut found = Vec::new();
+    if let Ok(entries) = fs::read_dir(project_root) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("csproj") {
+                found.push(path);
+            }
+        }
+    }
+
+    match found.len() {
+        0 => bail!(
+            "No .csproj found in {}. Cannot link a C# Fusion module.",
+            project_root.display()
+        ),
+        1 => Ok(found.remove(0)),
+        _ => {
+            // Prefer a project that isn't named after common test suffixes.
+            if let Some(main) = found.iter().find(|p| {
+                p.file_stem()
+                    .and_then(|s| s.to_str())
+                    .is_some_and(|name| !name.ends_with(".Tests") && !name.ends_with("Tests"))
+            }) {
+                return Ok(main.clone());
+            }
+            Ok(found.remove(0))
+        }
+    }
+}
+
+fn find_module_csproj(module_root: &Path, package: &str) -> Result<PathBuf> {
+    let candidates = [
+        module_root.join(package).join(format!("{package}.csproj")),
+        module_root.join(format!("{package}.csproj")),
+        module_root
+            .join("bindings")
+            .join("csharp")
+            .join(package)
+            .join(format!("{package}.csproj")),
+        module_root
+            .join("bindings")
+            .join("csharp")
+            .join(format!("{package}.csproj")),
+    ];
+
+    for path in candidates {
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+
+    bail!(
+        "No {package}.csproj found under {}. Set module.entry.csharp to the C# project name.",
+        module_root.display()
+    )
+}
+
 fn upsert_project_module(project_root: &Path, module: InstalledModule) -> Result<()> {
     let path = get::config_path_from(project_root);
     let content = fs::read_to_string(&path)?;
@@ -389,6 +539,7 @@ mod tests {
                 language: ModuleImplLanguage::Python,
                 target_python: true,
                 target_typescript: false,
+                target_csharp: false,
             },
         )
         .unwrap();
@@ -433,6 +584,7 @@ mod tests {
                 language: ModuleImplLanguage::Python,
                 target_python: true,
                 target_typescript: false,
+                target_csharp: false,
             },
         )
         .unwrap();

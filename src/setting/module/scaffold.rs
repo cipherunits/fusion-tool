@@ -1,6 +1,7 @@
 use super::manifest::{
-    npm_package_name, python_package_name, write_manifest, ModuleBuild, ModuleEntry, ModuleImpl,
-    ModuleImplLanguage, ModuleManifest, ModuleMeta, ModuleTargets, MANIFEST_FILE,
+    csharp_package_name, npm_package_name, python_package_name, write_manifest, ModuleBuild,
+    ModuleEntry, ModuleImpl, ModuleImplLanguage, ModuleManifest, ModuleMeta, ModuleTargets,
+    MANIFEST_FILE,
 };
 use anyhow::{bail, Context, Result};
 use console::style;
@@ -13,6 +14,7 @@ pub struct ModuleInitOptions {
     pub language: ModuleImplLanguage,
     pub target_python: bool,
     pub target_typescript: bool,
+    pub target_csharp: bool,
 }
 
 pub fn scaffold(target_dir: &Path, options: &ModuleInitOptions) -> Result<()> {
@@ -36,14 +38,20 @@ pub fn scaffold(target_dir: &Path, options: &ModuleInitOptions) -> Result<()> {
     let id = options.name.to_lowercase().replace('_', "-");
     let py_package = python_package_name(&id);
     let npm_package = npm_package_name(&id);
+    let cs_package = csharp_package_name(&id);
 
-    let (target_python, target_typescript) = match options.language {
-        ModuleImplLanguage::Python => (true, false),
-        ModuleImplLanguage::TypeScript => (false, true),
-        ModuleImplLanguage::Rust => (options.target_python, options.target_typescript),
+    let (target_python, target_typescript, target_csharp) = match options.language {
+        ModuleImplLanguage::Python => (true, false, false),
+        ModuleImplLanguage::TypeScript => (false, true, false),
+        ModuleImplLanguage::CSharp => (false, false, true),
+        ModuleImplLanguage::Rust => (
+            options.target_python,
+            options.target_typescript,
+            options.target_csharp,
+        ),
     };
 
-    if !target_python && !target_typescript {
+    if !target_python && !target_typescript && !target_csharp {
         bail!("Select at least one host target language.");
     }
 
@@ -59,12 +67,20 @@ pub fn scaffold(target_dir: &Path, options: &ModuleInitOptions) -> Result<()> {
             targets: ModuleTargets {
                 python: target_python,
                 typescript: target_typescript,
+                csharp: target_csharp,
             },
             entry: ModuleEntry {
                 python: target_python.then(|| py_package.clone()),
                 typescript: target_typescript.then(|| npm_package.clone()),
+                csharp: target_csharp.then(|| cs_package.clone()),
             },
-            build: default_build(options.language, target_python, target_typescript),
+            build: default_build(
+                options.language,
+                target_python,
+                target_typescript,
+                target_csharp,
+                &cs_package,
+            ),
         },
     };
 
@@ -73,7 +89,14 @@ pub fn scaffold(target_dir: &Path, options: &ModuleInitOptions) -> Result<()> {
 
     write(
         &target_dir.join("README.md"),
-        &readme_template(&id, &py_package, &npm_package, &options.description, options.language),
+        &readme_template(
+            &id,
+            &py_package,
+            &npm_package,
+            &cs_package,
+            &options.description,
+            options.language,
+        ),
     )?;
 
     write(
@@ -84,15 +107,18 @@ pub fn scaffold(target_dir: &Path, options: &ModuleInitOptions) -> Result<()> {
     match options.language {
         ModuleImplLanguage::Python => scaffold_python(target_dir, &id, &py_package)?,
         ModuleImplLanguage::TypeScript => scaffold_typescript(target_dir, &id, &npm_package)?,
+        ModuleImplLanguage::CSharp => scaffold_csharp(target_dir, &id, &cs_package)?,
         ModuleImplLanguage::Rust => {
             scaffold_rust(
                 target_dir,
                 &id,
                 &py_package,
                 &npm_package,
+                &cs_package,
                 target_python,
                 target_typescript,
-            )?
+                target_csharp,
+            )?;
         }
     }
 
@@ -103,6 +129,8 @@ fn default_build(
     language: ModuleImplLanguage,
     target_python: bool,
     target_typescript: bool,
+    target_csharp: bool,
+    cs_package: &str,
 ) -> ModuleBuild {
     match language {
         ModuleImplLanguage::Python => ModuleBuild {
@@ -113,6 +141,10 @@ fn default_build(
             typescript: Some("npm install && npm run build".to_string()),
             ..Default::default()
         },
+        ModuleImplLanguage::CSharp => ModuleBuild {
+            csharp: Some(format!("dotnet build -c Release {cs_package}/{cs_package}.csproj")),
+            ..Default::default()
+        },
         ModuleImplLanguage::Rust => ModuleBuild {
             rust: Some("cargo build --release".to_string()),
             python: target_python.then(|| {
@@ -121,6 +153,11 @@ fn default_build(
             typescript: target_typescript.then(|| {
                 "npm install --prefix bindings/node && npm run build --prefix bindings/node"
                     .to_string()
+            }),
+            csharp: target_csharp.then(|| {
+                format!(
+                    "dotnet build -c Release bindings/csharp/{cs_package}/{cs_package}.csproj"
+                )
             }),
         },
     }
@@ -250,13 +287,56 @@ module.exports = {{ hello }};
     Ok(())
 }
 
+fn scaffold_csharp(target_dir: &Path, id: &str, cs_package: &str) -> Result<()> {
+    let proj_dir = target_dir.join(cs_package);
+    fs::create_dir_all(&proj_dir)?;
+
+    write(
+        &proj_dir.join(format!("{cs_package}.csproj")),
+        &format!(
+            r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>{cs_package}</RootNamespace>
+    <AssemblyName>{cs_package}</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>Fusion module {id}</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>
+"#
+        ),
+    )?;
+
+    write(
+        &proj_dir.join("Module.cs"),
+        &format!(
+            r#"namespace {cs_package};
+
+/// <summary>Fusion module `{id}` — importable helpers for Fusion C# apps.</summary>
+public static class Module
+{{
+    public static string Hello(string name = "Fusion") =>
+        $"Hello, {{name}}! (from {id})";
+}}
+"#
+        ),
+    )?;
+
+    Ok(())
+}
+
 fn scaffold_rust(
     target_dir: &Path,
     id: &str,
     py_package: &str,
     npm_package: &str,
+    cs_package: &str,
     target_python: bool,
     target_typescript: bool,
+    target_csharp: bool,
 ) -> Result<()> {
     let crate_name = format!("fusion_{}_mod", id.replace('-', "_"));
     let core_dir = target_dir.join("crates").join("core");
@@ -304,7 +384,7 @@ path = "src/lib.rs"
         &core_dir.join("src/lib.rs"),
         &format!(
             r#"//! Core logic for the `{id}` Fusion module.
-//! Keep this crate free of PyO3 / N-API so both bindings can share it.
+//! Keep this crate free of PyO3 / N-API so Python, Node, and C# bindings can share it.
 
 pub fn hello(name: &str) -> String {{
     format!("Hello, {{name}}! (from {id})")
@@ -330,6 +410,59 @@ mod tests {{
     if target_typescript {
         scaffold_rust_node(target_dir, id, npm_package, &crate_name)?;
     }
+
+    if target_csharp {
+        scaffold_rust_csharp(target_dir, id, cs_package, &crate_name)?;
+    }
+
+    Ok(())
+}
+
+fn scaffold_rust_csharp(
+    target_dir: &Path,
+    id: &str,
+    cs_package: &str,
+    crate_name: &str,
+) -> Result<()> {
+    let bind_dir = target_dir.join("bindings").join("csharp").join(cs_package);
+    fs::create_dir_all(&bind_dir)?;
+
+    write(
+        &bind_dir.join(format!("{cs_package}.csproj")),
+        &format!(
+            r#"<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>{cs_package}</RootNamespace>
+    <AssemblyName>{cs_package}</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>Fusion module {id} (C# host binding)</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>
+"#
+        ),
+    )?;
+
+    write(
+        &bind_dir.join("Module.cs"),
+        &format!(
+            r#"namespace {cs_package};
+
+/// <summary>
+/// C# host binding for Rust module `{id}` (`{crate_name}`).
+/// Replace <see cref="Hello"/> with your public API; keep shared logic in <c>crates/core</c>.
+/// </summary>
+public static class Module
+{{
+    public static string Hello(string name = "Fusion") =>
+        $"Hello, {{name}}! (from {id})";
+}}
+"#
+        ),
+    )?;
 
     Ok(())
 }
@@ -546,11 +679,12 @@ fn readme_template(
     id: &str,
     py_package: &str,
     npm_package: &str,
+    cs_package: &str,
     description: &str,
     language: ModuleImplLanguage,
 ) -> String {
     let usage = match language {
-        ModuleImplLanguage::Python | ModuleImplLanguage::Rust => format!(
+        ModuleImplLanguage::Python => format!(
             r#"```python
 from {py_package} import hello
 
@@ -562,6 +696,32 @@ print(hello("world"))
 import {{ hello }} from "{npm_package}";
 
 console.log(hello("world"));
+```"#
+        ),
+        ModuleImplLanguage::CSharp => format!(
+            r#"```csharp
+using {cs_package};
+
+Console.WriteLine(Module.Hello("world"));
+```"#
+        ),
+        ModuleImplLanguage::Rust => format!(
+            r#"```python
+from {py_package} import hello
+
+print(hello("world"))
+```
+
+```ts
+import {{ hello }} from "{npm_package}";
+
+console.log(hello("world"));
+```
+
+```csharp
+using {cs_package};
+
+Console.WriteLine(Module.Hello("world"));
 ```"#
         ),
     };
@@ -577,6 +737,7 @@ Recommended (not required):
 
 - Python import package: `fusion_<name>_mod` (this package: `{py_package}`)
 - npm package: `fusion-<name>-mod` (this package: `{npm_package}`)
+- C# project / namespace: `Fusion<Name>Mod` (this package: `{cs_package}`)
 
 ## Implementation
 
@@ -616,6 +777,11 @@ js/*.js.map
 *.tsbuildinfo
 "#
         }
+        ModuleImplLanguage::CSharp => {
+            r#"bin/
+obj/
+"#
+        }
         ModuleImplLanguage::Rust => {
             r#"target/
 node_modules/
@@ -624,6 +790,8 @@ __pycache__/
 .venv/
 dist/
 *.egg-info/
+bin/
+obj/
 "#
         }
     }
@@ -672,6 +840,7 @@ mod tests {
                 language: ModuleImplLanguage::Python,
                 target_python: true,
                 target_typescript: false,
+                target_csharp: false,
             },
         )
         .unwrap();
@@ -706,6 +875,7 @@ mod tests {
                 language: ModuleImplLanguage::Rust,
                 target_python: true,
                 target_typescript: true,
+                target_csharp: true,
             },
         )
         .unwrap();
@@ -716,6 +886,9 @@ mod tests {
             .join("bindings/python/python/fusion_tokens_mod/routes.py")
             .exists());
         assert!(dir.join("js/index.js").is_file());
+        assert!(dir
+            .join("bindings/csharp/FusionTokensMod/Module.cs")
+            .is_file());
 
         let js = fs::read_to_string(dir.join("js/index.js")).unwrap();
         assert!(js.contains("function hello"));
@@ -743,6 +916,7 @@ mod tests {
                 language: ModuleImplLanguage::TypeScript,
                 target_python: false,
                 target_typescript: true,
+                target_csharp: false,
             },
         )
         .unwrap();
@@ -750,6 +924,39 @@ mod tests {
         let src = fs::read_to_string(dir.join("src/index.ts")).unwrap();
         assert!(src.contains("export function hello"));
         assert!(!src.contains("fusion-framework"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_scaffold_csharp() {
+        let dir = std::env::temp_dir().join(format!(
+            "fusion-mod-cs-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        scaffold(
+            &dir,
+            &ModuleInitOptions {
+                name: "security".into(),
+                description: "Security helpers".into(),
+                language: ModuleImplLanguage::CSharp,
+                target_python: false,
+                target_typescript: false,
+                target_csharp: true,
+            },
+        )
+        .unwrap();
+
+        assert!(dir.join("FusionSecurityMod/Module.cs").is_file());
+        assert!(dir.join("FusionSecurityMod/FusionSecurityMod.csproj").is_file());
+        let src = fs::read_to_string(dir.join("FusionSecurityMod/Module.cs")).unwrap();
+        assert!(src.contains("Hello"));
+        assert!(!src.contains("FusionBaseApi"));
 
         let _ = fs::remove_dir_all(&dir);
     }

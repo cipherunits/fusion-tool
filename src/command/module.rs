@@ -29,28 +29,31 @@ pub fn module_init(
             let languages = vec![
                 "Python — pure Fusion module",
                 "TypeScript — pure Fusion module",
-                "Rust — core + PyO3 / N-API (all host languages)",
+                "C# — pure Fusion module",
+                "Rust — core + PyO3 / N-API / C# binding",
             ];
 
             let selection = Select::new()
                 .with_prompt("Module implementation language")
                 .items(&languages)
-                .default(2)
+                .default(3)
                 .interact()?;
 
             match selection {
                 0 => ModuleImplLanguage::Python,
                 1 => ModuleImplLanguage::TypeScript,
-                2 => ModuleImplLanguage::Rust,
+                2 => ModuleImplLanguage::CSharp,
+                3 => ModuleImplLanguage::Rust,
                 _ => unreachable!(),
             }
         }
     };
 
-    let (target_python, target_typescript) = match language {
-        ModuleImplLanguage::Python => (true, false),
-        ModuleImplLanguage::TypeScript => (false, true),
-        ModuleImplLanguage::Rust if lang_from_cli => (true, true),
+    let (target_python, target_typescript, target_csharp) = match language {
+        ModuleImplLanguage::Python => (true, false, false),
+        ModuleImplLanguage::TypeScript => (false, true, false),
+        ModuleImplLanguage::CSharp => (false, false, true),
+        ModuleImplLanguage::Rust if lang_from_cli => (true, true, true),
         ModuleImplLanguage::Rust => prompt_rust_targets()?,
     };
 
@@ -131,6 +134,7 @@ pub fn module_init(
             language,
             target_python,
             target_typescript,
+            target_csharp,
         },
     )?;
 
@@ -146,6 +150,9 @@ pub fn module_init(
         ModuleImplLanguage::TypeScript => {
             crate::setting::module::manifest::npm_package_name(&id)
         }
+        ModuleImplLanguage::CSharp => {
+            crate::setting::module::manifest::csharp_package_name(&id)
+        }
         _ => crate::setting::module::manifest::python_package_name(&id),
     };
 
@@ -155,7 +162,7 @@ pub fn module_init(
     println!(
         "  Package:  {} {}",
         style(&suggested_package).yellow(),
-        style("(recommended fusion_<name>_mod / fusion-<name>-mod)").dim()
+        style("(recommended fusion_<name>_mod / fusion-<name>-mod / Fusion<Name>Mod)").dim()
     );
     println!();
     println!("Next:");
@@ -171,9 +178,9 @@ pub fn module_init(
     Ok(())
 }
 
-fn prompt_rust_targets() -> Result<(bool, bool)> {
-    let items = vec!["Python (PyO3)", "TypeScript (N-API)"];
-    let defaults = vec![true, true];
+fn prompt_rust_targets() -> Result<(bool, bool, bool)> {
+    let items = vec!["Python (PyO3)", "TypeScript (N-API)", "C# (managed binding)"];
+    let defaults = vec![true, true, true];
 
     let selected = MultiSelect::new()
         .with_prompt("Host languages this Rust module should support")
@@ -183,10 +190,11 @@ fn prompt_rust_targets() -> Result<(bool, bool)> {
 
     let target_python = selected.contains(&0);
     let target_typescript = selected.contains(&1);
+    let target_csharp = selected.contains(&2);
 
-    if !target_python && !target_typescript {
+    if !target_python && !target_typescript && !target_csharp {
         bail!("Select at least one host language target.");
     }
 
-    Ok((target_python, target_typescript))
+    Ok((target_python, target_typescript, target_csharp))
 }

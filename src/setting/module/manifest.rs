@@ -37,6 +37,7 @@ pub struct ModuleImpl {
 pub enum ModuleImplLanguage {
     Python,
     TypeScript,
+    CSharp,
     Rust,
 }
 
@@ -45,6 +46,7 @@ impl ModuleImplLanguage {
         match self {
             Self::Python => "python",
             Self::TypeScript => "typescript",
+            Self::CSharp => "csharp",
             Self::Rust => "rust",
         }
     }
@@ -53,9 +55,10 @@ impl ModuleImplLanguage {
         match value.to_lowercase().as_str() {
             "python" | "py" => Ok(Self::Python),
             "typescript" | "ts" | "javascript" | "js" | "node" => Ok(Self::TypeScript),
+            "csharp" | "cs" | "asp-core" | "aspnet" | "aspnetcore" => Ok(Self::CSharp),
             "rust" | "rs" => Ok(Self::Rust),
             _ => bail!(
-                "Unsupported module language '{}'. Available: python, typescript, rust",
+                "Unsupported module language '{}'. Available: python, typescript, csharp, rust",
                 value
             ),
         }
@@ -68,6 +71,8 @@ pub struct ModuleTargets {
     pub python: bool,
     #[serde(default = "default_true")]
     pub typescript: bool,
+    #[serde(default)]
+    pub csharp: bool,
 }
 
 impl Default for ModuleTargets {
@@ -75,6 +80,7 @@ impl Default for ModuleTargets {
         Self {
             python: true,
             typescript: true,
+            csharp: false,
         }
     }
 }
@@ -89,6 +95,8 @@ pub struct ModuleEntry {
     pub python: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub typescript: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub csharp: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
@@ -97,6 +105,8 @@ pub struct ModuleBuild {
     pub python: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub typescript: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub csharp: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rust: Option<String>,
 }
@@ -210,8 +220,11 @@ pub fn validate_manifest(manifest: &ModuleManifest) -> Result<()> {
         bail!("module.version must not be empty");
     }
 
-    if !manifest.module.targets.python && !manifest.module.targets.typescript {
-        bail!("module.targets must enable at least one of python or typescript");
+    if !manifest.module.targets.python
+        && !manifest.module.targets.typescript
+        && !manifest.module.targets.csharp
+    {
+        bail!("module.targets must enable at least one of python, typescript, or csharp");
     }
 
     match manifest.module.impl_.language {
@@ -238,6 +251,14 @@ pub fn validate_manifest(manifest: &ModuleManifest) -> Result<()> {
                 bail!("module.entry.typescript is required for TypeScript modules");
             }
         }
+        ModuleImplLanguage::CSharp => {
+            if !manifest.module.targets.csharp {
+                bail!("A C# module must target csharp");
+            }
+            if manifest.module.entry.csharp.as_deref().unwrap_or("").is_empty() {
+                bail!("module.entry.csharp is required for C# modules");
+            }
+        }
         ModuleImplLanguage::Rust => {
             if manifest.module.targets.python
                 && manifest.module.entry.python.as_deref().unwrap_or("").is_empty()
@@ -254,6 +275,11 @@ pub fn validate_manifest(manifest: &ModuleManifest) -> Result<()> {
                     .is_empty()
             {
                 bail!("module.entry.typescript is required when targeting typescript");
+            }
+            if manifest.module.targets.csharp
+                && manifest.module.entry.csharp.as_deref().unwrap_or("").is_empty()
+            {
+                bail!("module.entry.csharp is required when targeting csharp");
             }
         }
     }
@@ -285,10 +311,27 @@ pub fn npm_package_name(id: &str) -> String {
     format!("fusion-{id}-mod")
 }
 
+pub fn csharp_package_name(id: &str) -> String {
+    // Recommended: FusionJwtMod
+    let pascal: String = id
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => format!("{}{}", first.to_ascii_uppercase(), chars.as_str()),
+                None => String::new(),
+            }
+        })
+        .collect();
+    format!("Fusion{pascal}Mod")
+}
+
 pub fn supports_host_language(manifest: &ModuleManifest, host_language: &str) -> bool {
     match host_language {
         "python" => manifest.module.targets.python,
         "typescript" => manifest.module.targets.typescript,
+        "asp-core" | "csharp" => manifest.module.targets.csharp,
         _ => false,
     }
 }
@@ -367,5 +410,35 @@ python = "fusion_example_mod"
     fn test_python_package_name() {
         assert_eq!(python_package_name("jwt"), "fusion_jwt_mod");
         assert_eq!(python_package_name("jwt-auth"), "fusion_jwt_auth_mod");
+    }
+
+    #[test]
+    fn test_csharp_package_name() {
+        assert_eq!(csharp_package_name("jwt"), "FusionJwtMod");
+        assert_eq!(csharp_package_name("jwt-auth"), "FusionJwtAuthMod");
+    }
+
+    #[test]
+    fn test_parse_csharp_manifest() {
+        let toml = r#"
+[module]
+id = "example"
+name = "example"
+version = "0.1.0"
+
+[module.impl]
+language = "csharp"
+
+[module.targets]
+python = false
+typescript = false
+csharp = true
+
+[module.entry]
+csharp = "FusionExampleMod"
+"#;
+        let manifest = parse_manifest(toml).unwrap();
+        assert_eq!(manifest.module.impl_.language, ModuleImplLanguage::CSharp);
+        assert!(supports_host_language(&manifest, "asp-core"));
     }
 }
