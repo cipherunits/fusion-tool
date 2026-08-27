@@ -3,8 +3,9 @@ use serde::{Deserialize, Serialize};
 /// Version of this CLI, kept in sync with Cargo.toml by the compiler
 pub const FUSION_TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Version of the framework the generated projects target
-pub const FUSION_FRAMEWORK_VERSION: &str = "1.2.2";
+/// Version of the framework the generated projects target.
+/// Keep in sync with fusion-framework package versions (Cargo / PyPI / npm / NuGet).
+pub const FUSION_FRAMEWORK_VERSION: &str = "1.2.3";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {

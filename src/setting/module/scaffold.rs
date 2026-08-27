@@ -296,7 +296,7 @@ fn scaffold_csharp(target_dir: &Path, id: &str, cs_package: &str) -> Result<()> 
         &format!(
             r#"<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>{cs_package}</RootNamespace>
@@ -432,7 +432,7 @@ fn scaffold_rust_csharp(
         &format!(
             r#"<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>{cs_package}</RootNamespace>

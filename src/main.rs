@@ -12,7 +12,8 @@
  * desktop application for managing Fusion Framework projects.
  *
  * Documentation:
- *   FIXME:‌ add fusion-framework docs here!!
+ *   https://fusion.cipherunit.xyz/
+ *   https://github.com/cipherunits/fusion-framework
  *
  * GitHub:
  *   https://github.com/cipherunits/fusion-tool

@@ -126,7 +126,7 @@ fn swagger_config(enabled: bool) -> serde_json::Value {
         },
         "navbar": {
             "enabled": true,
-            "showUrlInput": true
+            "showUrlInput": false
         },
         "ui": {
             "deepLinking": true,
@@ -168,6 +168,9 @@ fn environment_file(
                 "secret_key": secret_key,
                 "host": host,
                 "debug": debug,
+                "fingerprint": {
+                    "enabled": true
+                },
                 "swagger": swagger_config(swagger_enabled),
             }),
             commands: commands(language),
@@ -176,6 +179,7 @@ fn environment_file(
 }
 
 pub fn dev(target_dir: &Path, language: &config::Language) -> Result<()> {
+    // Explicit port — do not rely on fusion-core's bare default (3000).
     environment_file(target_dir, "dev", 8080, &generate_uuid(), language, "127.0.0.1", true, true)
 }
 
@@ -184,7 +188,7 @@ pub fn prod(target_dir: &Path, language: &config::Language) -> Result<()> {
 }
 
 pub fn stage(target_dir: &Path, language: &config::Language) -> Result<()> {
-    environment_file(target_dir, "stage", 1010, &generate_uuid(), language, "HOST", false, false)
+    environment_file(target_dir, "stage", 8081, &generate_uuid(), language, "HOST", false, false)
 }
 
 pub fn git(target_dir: &Path, language: &config::Language) -> Result<()> {
@@ -241,75 +245,62 @@ dmypy.json
 
         config::Language::TypeScript => {
             r#"
+# Dependencies
 node_modules/
-.node_modules/
-built/*
-tests/cases/rwc/*
-tests/cases/perf/*
-!tests/cases/webharness/compilerToString.js
-test-args.txt
-~*.docx
-\#*\#
-.\#*
-tests/baselines/local/*
-tests/baselines/local.old/*
-tests/services/baselines/local/*
-tests/baselines/local.old/*
-tests/baselines/reference/*
-tests/baselines/reference/projectOutput/*
-tests/baselines/local/projectOutput/*
-tests/baselines/reference/testresults.tap
-tests/baselines/symlinks/*
-tests/services/baselines/prototyping/local/*
-tests/services/browser/typescriptServices.js
-src/harness/*.js
-src/compiler/diagnosticInformationMap.generated.ts
-src/compiler/diagnosticMessages.generated.json
-src/parser/diagnosticInformationMap.generated.ts
-src/parser/diagnosticMessages.generated.json
-rwc-report.html
-*.swp
-build.json
-*.actual
-tests/webTestServer.js
-tests/webTestServer.js.map
-tests/webhost/*.d.ts
-tests/webhost/webtsc.js
-tests/cases/**/*.js
-tests/cases/**/*.js.map
-*.config
-scripts/eslint/built/
-scripts/debug.bat
-scripts/run.bat
-scripts/**/*.js
-scripts/**/*.js.map
+
+# Build
+dist/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs / coverage
+logs/
+*.log
 coverage/
-internal/
-**/.DS_Store
-.settings
-**/.vs
-**/.vscode/*
-!**/.vscode/tasks.json
-!**/.vscode/settings.template.json
-!**/.vscode/launch.template.json
-!**/.vscode/extensions.json
-!tests/cases/projects/projectOption/**/node_modules
-!tests/cases/projects/NodeModulesSearch/**/*
-!tests/baselines/reference/project/nodeModules*/**/*
-.idea
-yarn.lock
-yarn-error.log
-.parallelperf.*
-tests/baselines/reference/dt
-.failed-tests
-TEST-results.xml
-package-lock.json
-.eslintcache
-*v8.log
-/lib/"#
+.nyc_output/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Fusion modules vendored by `fusion add`
+.fusion/
+"#
         }
 
-        config::Language::AspNetCore => "",
+        config::Language::AspNetCore => {
+            r#"
+# Build
+bin/
+obj/
+out/
+
+# User-specific
+*.user
+*.suo
+.vs/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Fusion modules vendored by `fusion add`
+.fusion/
+"#
+        }
     };
 
     if !git_content.is_empty() {
@@ -326,4 +317,61 @@ package-lock.json
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::setting::config::Language;
+
+    #[test]
+    fn test_dev_environment_includes_fingerprint_and_swagger() {
+        let dir = std::env::temp_dir().join(format!("fusion-env-dev-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        dev(&dir, &Language::Python).unwrap();
+        let env = read(&dir, "dev").unwrap();
+        assert_eq!(env.env, "dev");
+        assert_eq!(env.config["port"], 8080);
+        assert_eq!(env.config["fingerprint"]["enabled"], true);
+        assert_eq!(env.config["swagger"]["enabled"], true);
+        assert_eq!(
+            env.commands.get("run").map(String::as_str),
+            Some("python main.py")
+        );
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn test_stage_port_is_8081() {
+        let dir = std::env::temp_dir().join(format!("fusion-env-stage-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        stage(&dir, &Language::TypeScript).unwrap();
+        let env = read(&dir, "stage").unwrap();
+        assert_eq!(env.config["port"], 8081);
+        assert_eq!(env.config["swagger"]["enabled"], false);
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn test_gitignore_written_for_all_languages() {
+        for lang in [Language::Python, Language::TypeScript, Language::AspNetCore] {
+            let dir = std::env::temp_dir().join(format!(
+                "fusion-gitignore-{}-{}",
+                lang.name(),
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(&dir).unwrap();
+            git(&dir, &lang).unwrap();
+            let content = fs::read_to_string(dir.join(".gitignore")).unwrap();
+            assert!(content.contains(".fusion/"));
+            fs::remove_dir_all(&dir).unwrap();
+        }
+    }
 }

@@ -9,13 +9,13 @@ const PROJECT_NAME_PLACEHOLDER: &str = "__PROJECT_NAME__";
 const PYTHON_MAIN: &str = r#"
 """Entry point: register routes, middleware, and start the server."""
 
-import src.modules.products.products  # registers @router classes
+import src.modules.products.products  # registers @route classes
 
 from fusion_framework.app import FusionApp
 from fusion_framework.config import get_settings, load_settings_module
 
-# Global middleware (optional).
-# Each item: (request, call_next) -> response | call_next(request)
+# Extra global middleware (optional).
+# FusionApp already registers framework_headers() (X-Powered-By / X-Framework / X-Fusion-Version).
 # Example:
 #   from fusion_framework import bearer_jwt
 #   MIDDLEWARE = [bearer_jwt()]
@@ -36,60 +36,58 @@ if __name__ == "__main__":
 "#;
 
 const PYTHON_PRODUCTS: &str = r#"
-# Fusion Framework
+# Fusion Framework — application route module (FMA)
 # Docs:     https://fusion.cipherunit.xyz/
 # Desktop:  https://fusion.cipherunit.xyz/en/gui
 # CLI tool: https://github.com/cipherunits/fusion-tool
 
-
-from fusion_framework.api import FusionBaseApi
-from fusion_framework.route import route
 from fusion_framework import status
+from fusion_framework.api import FusionBaseApi
+from fusion_framework.http_route import http_get
+from fusion_framework.route import route
+
 
 @route(
-      "api/[module]/",
-      tags=["swagger"],
-      desc="Fusion Framework Api",
-      version="v1",
-      deprecated=False
-      )
+    "api/[module]/",
+    tags=["products"],
+    desc="Product resource",
+    version="v1",
+    deprecated=False,
+)
 class ProductModule(FusionBaseApi):
-    """Product management module."""
+    """Product management route module."""
 
     def get(self):
-        return self.response({"products_id": 12},status=status.HTTP_SUCCESS)
+        # GET /v1/api/product/
+        return self.response({"products_id": 12}, status=status.HTTP_SUCCESS)
 
     def post(self):
-            return self.response({"products_id": 12},status=status.HTTP_201_CREATED)
-    
+        return self.response({"products_id": 12}, status=status.HTTP_201_CREATED)
+
     def delete(self):
-            return self.response({"products_id": 12},status=status.HTTP_204_NO_CONTENT)
-    
+        return self.response({"products_id": 12}, status=status.HTTP_204_NO_CONTENT)
+
     def patch(self):
-            return self.response({"products_id": 12},status=status.HTTP_SUCCESS)
-        
+        return self.response({"products_id": 12}, status=status.HTTP_SUCCESS)
+
+    @http_get("catalog/[action]", title="Product catalog", tags=["products"])
+    def CatalogAction(self):
+        # GET /v1/api/product/catalog/catalog
+        return self.response({"items": []}, status=status.HTTP_SUCCESS)
+
 "#;
 
 const PYTHON_SETTINGS: &str = r#"
+# Fusion Framework settings overlay (UPPERCASE names are merged into settings).
+# Runtime values primarily come from fusion.<env>.json (FUSION_ENV, default: dev).
 # Docs: https://fusion.cipherunit.xyz/
 
-# Fusion Framework Settings
-# --------------------------------------------
-# This file contains the core configuration
-# for your application.
-#
-# License: MIT License
-# You are free to use, modify, and distribute.
-
-
-# variables or external config providers.
 from fusion_framework import settings
 
-
-# Never expose your secret key in public repositories
+# Never commit real secrets — prefer ALL_CAPS env placeholders in fusion.<env>.json
 SECRET_KEY = settings.get("secret_key")
 
-# Enable debug mode (DO NOT use True in production)
+# Prefer reading debug from JSON; keep False as a safe default here
 DEBUG = settings.get("debug", default=False)
 
 "#;
@@ -102,7 +100,8 @@ import "./src/modules/products/products";
 
 import { FusionApp, getSettings, settings } from "fusion-framework";
 
-// Global middleware (optional). Framework ships with none by default.
+// Extra global middleware (optional).
+// FusionApp already registers frameworkHeaders() (X-Powered-By / X-Framework / X-Fusion-Version).
 // Example: import { bearerJwt } from "fusion-framework"; const MIDDLEWARE = [bearerJwt()];
 const MIDDLEWARE: Array<(req: any, next: any) => any> = [];
 
@@ -120,46 +119,59 @@ main().catch((err) => {
 "#;
 
 const TYPESCRIPT_PRODUCTS: &str = r#"
-// Fusion Framework
+// Fusion Framework — application route module (FMA)
 // Docs:     https://fusion.cipherunit.xyz/
 // Desktop:  https://fusion.cipherunit.xyz/en/gui
 // CLI tool: https://github.com/cipherunits/fusion-tool
 
-import { FusionBaseApi, route, status } from "fusion-framework";
+import { FusionBaseApi, httpGet, route, status } from "fusion-framework";
 
-export const ProductModule = route("api/[module]/", {
-  tags: ["swagger"],
-  desc: "Fusion Framework Api",
+class ProductModule extends FusionBaseApi {
+  get() {
+    // GET /v1/api/product/
+    return this.response({ products_id: 12 }, status.HTTP_SUCCESS);
+  }
+
+  post() {
+    return this.response({ products_id: 12 }, status.HTTP_201_CREATED);
+  }
+
+  delete() {
+    return this.response({ products_id: 12 }, status.HTTP_204_NO_CONTENT);
+  }
+
+  patch() {
+    return this.response({ products_id: 12 }, status.HTTP_SUCCESS);
+  }
+
+  CatalogAction() {
+    // GET /v1/api/product/catalog/catalog
+    return this.response({ items: [] }, status.HTTP_SUCCESS);
+  }
+}
+
+httpGet("catalog/[action]", {
+  title: "Product catalog",
+  tags: ["products"],
+})(ProductModule.prototype.CatalogAction);
+
+route("api/[module]/", {
+  tags: ["products"],
+  desc: "Product resource",
   version: "v1",
   deprecated: false,
-})(
-  class ProductModule extends FusionBaseApi {
-    get() {
-      return this.response({ products_id: 12 }, status.HTTP_SUCCESS);
-    }
+})(ProductModule);
 
-    post() {
-      return this.response({ products_id: 12 }, status.HTTP_201_CREATED);
-    }
-
-    delete() {
-      return this.response({ products_id: 12 }, status.HTTP_204_NO_CONTENT);
-    }
-
-    patch() {
-      return this.response({ products_id: 12 }, status.HTTP_SUCCESS);
-    }
-  },
-);
+export { ProductModule };
 "#;
 
 const TYPESCRIPT_SETTINGS: &str = r#"
-// Fusion Framework Settings
+// Fusion Framework settings overlay.
 // Values come from fusion.<env>.json (FUSION_ENV, default: dev).
 
 import { settings } from "fusion-framework";
 
-settings.ensureLoaded();
+settings.ensureLoaded([process.cwd()]);
 
 export const SECRET_KEY = settings.get("secret_key");
 export const DEBUG = settings.get("debug", false);
@@ -170,7 +182,9 @@ const CSHARP_MAIN: &str = r#"
 using System.Collections.Generic;
 using FusionFramework;
 
-// Global middleware (optional). Framework ships with none by default.
+// Extra global middleware (optional).
+// FusionApp already registers Middleware.FrameworkHeaders()
+// (X-Powered-By / X-Framework / X-Fusion-Version).
 // Example: MIDDLEWARE.Add(Middleware.BearerJwt());
 static class Program
 {
@@ -189,7 +203,7 @@ static class Program
 "#;
 
 const CSHARP_PRODUCTS: &str = r#"
-// Fusion Framework
+// Fusion Framework — application route module (FMA)
 // Docs:     https://fusion.cipherunit.xyz/
 // Desktop:  https://fusion.cipherunit.xyz/en/gui
 // CLI tool: https://github.com/cipherunits/fusion-tool
@@ -198,9 +212,10 @@ using FusionFramework;
 
 namespace Products;
 
-[Route("api/[module]", Tags = new[] { "swagger" }, Desc = "Fusion Framework Api", Version = "v1")]
+[Route("api/[module]", Tags = new[] { "products" }, Desc = "Product resource", Version = "v1")]
 public class ProductModule : FusionBaseApi
 {
+    // GET /v1/api/product
     public object Get() =>
         Response(new { products_id = 12 }, Status.HTTP_SUCCESS);
 
@@ -212,11 +227,16 @@ public class ProductModule : FusionBaseApi
 
     public object Patch() =>
         Response(new { products_id = 12 }, Status.HTTP_SUCCESS);
+
+    // GET /v1/api/product/catalog/catalog
+    [HttpGet("catalog/[action]", Title = "Product catalog")]
+    public object CatalogAction() =>
+        Response(new { items = Array.Empty<object>() }, Status.HTTP_SUCCESS);
 }
 "#;
 
 const CSHARP_SETTINGS: &str = r#"
-// Fusion Framework Settings
+// Fusion Framework settings overlay.
 // Values come from fusion.<env>.json (FUSION_ENV, default: dev).
 
 using FusionFramework;
@@ -293,7 +313,29 @@ fn write_language_project_files(
     project_name: &str,
 ) -> Result<()> {
     match language {
-        Language::Python => Ok(()),
+        Language::Python => {
+            let requirements = format!(
+                "fusion-framework=={version}\n",
+                version = crate::setting::FUSION_FRAMEWORK_VERSION,
+            );
+            write(target_dir.join("requirements.txt").as_path(), &requirements)?;
+
+            let pyproject = format!(
+                r#"[project]
+name = "{name}"
+version = "0.1.0"
+description = "Fusion Framework application"
+requires-python = ">=3.9"
+dependencies = [
+  "fusion-framework=={version}",
+]
+"#,
+                name = project_name.replace('_', "-"),
+                version = crate::setting::FUSION_FRAMEWORK_VERSION,
+            );
+            write(target_dir.join("pyproject.toml").as_path(), &pyproject)?;
+            Ok(())
+        }
         Language::TypeScript => {
             let package_json = format!(
                 r#"{{
@@ -310,7 +352,11 @@ fn write_language_project_files(
   }},
   "devDependencies": {{
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }},
+  "engines": {{
+    "node": ">=18"
   }}
 }}
 "#,
@@ -328,7 +374,8 @@ fn write_language_project_files(
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "types": ["node"]
   },
   "include": ["**/*.ts"]
 }
@@ -341,7 +388,7 @@ fn write_language_project_files(
                 r#"<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>{ns}</RootNamespace>
@@ -408,26 +455,93 @@ fn report(path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::setting::FUSION_FRAMEWORK_VERSION;
+
+    fn temp_dir(label: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "fusion-structure-test-{}-{}",
+            label,
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
 
     #[test]
     fn test_python_layout_is_created() {
-        let target_dir =
-            std::env::temp_dir().join(format!("fusion-structure-test-{}", std::process::id()));
-
-        fs::create_dir_all(&target_dir).unwrap();
+        let target_dir = temp_dir("python");
 
         create(&target_dir, &Language::Python, "my-app").unwrap();
 
         assert!(target_dir.join("main.py").is_file());
         assert!(target_dir.join("core/settings.py").is_file());
-        assert!(target_dir.join("src/modules").is_dir());
-        assert!(target_dir.join("src/modules/products").is_dir());
         assert!(target_dir.join("src/modules/products/products.py").is_file());
+        assert!(target_dir.join("requirements.txt").is_file());
+        assert!(target_dir.join("pyproject.toml").is_file());
 
-        let settings = fs::read_to_string(target_dir.join("core/settings.py")).unwrap();
+        let main = fs::read_to_string(target_dir.join("main.py")).unwrap();
+        assert!(main.contains("registers @route classes"));
+        assert!(main.contains("framework_headers()"));
+        assert!(!main.contains("@router"));
 
-        assert!(settings.contains("SECRET_KEY = settings.get(\"secret_key\")"));
-        assert!(!settings.contains(PROJECT_NAME_PLACEHOLDER));
+        let products = fs::read_to_string(target_dir.join("src/modules/products/products.py")).unwrap();
+        assert!(products.contains("http_get"));
+        assert!(products.contains("CatalogAction"));
+        assert!(products.contains("version=\"v1\""));
+
+        let requirements = fs::read_to_string(target_dir.join("requirements.txt")).unwrap();
+        assert!(requirements.contains(&format!("fusion-framework=={FUSION_FRAMEWORK_VERSION}")));
+
+        fs::remove_dir_all(&target_dir).unwrap();
+    }
+
+    #[test]
+    fn test_typescript_layout_is_created() {
+        let target_dir = temp_dir("typescript");
+
+        create(&target_dir, &Language::TypeScript, "my-app").unwrap();
+
+        assert!(target_dir.join("main.ts").is_file());
+        assert!(target_dir.join("package.json").is_file());
+        assert!(target_dir.join("tsconfig.json").is_file());
+        assert!(target_dir.join("src/modules/products/products.ts").is_file());
+
+        let package = fs::read_to_string(target_dir.join("package.json")).unwrap();
+        assert!(package.contains(&format!("\"fusion-framework\": \"{FUSION_FRAMEWORK_VERSION}\"")));
+
+        let products = fs::read_to_string(target_dir.join("src/modules/products/products.ts")).unwrap();
+        assert!(products.contains("httpGet"));
+        assert!(products.contains("CatalogAction"));
+
+        let main = fs::read_to_string(target_dir.join("main.ts")).unwrap();
+        assert!(main.contains("frameworkHeaders()"));
+        assert!(!main.contains("ships with none by default"));
+
+        fs::remove_dir_all(&target_dir).unwrap();
+    }
+
+    #[test]
+    fn test_csharp_layout_is_created() {
+        let target_dir = temp_dir("csharp");
+
+        create(&target_dir, &Language::AspNetCore, "my-app").unwrap();
+
+        assert!(target_dir.join("main.cs").is_file());
+        assert!(target_dir.join("my-app.csproj").is_file());
+        assert!(target_dir.join("src/modules/products/products.cs").is_file());
+
+        let csproj = fs::read_to_string(target_dir.join("my-app.csproj")).unwrap();
+        assert!(csproj.contains("net10.0"));
+        assert!(csproj.contains(&format!("Version=\"{FUSION_FRAMEWORK_VERSION}\"")));
+
+        let products = fs::read_to_string(target_dir.join("src/modules/products/products.cs")).unwrap();
+        assert!(products.contains("[HttpGet"));
+        assert!(products.contains("CatalogAction"));
+
+        let main = fs::read_to_string(target_dir.join("main.cs")).unwrap();
+        assert!(main.contains("FrameworkHeaders()"));
+        assert!(!main.contains("ships with none by default"));
 
         fs::remove_dir_all(&target_dir).unwrap();
     }

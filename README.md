@@ -249,24 +249,29 @@ fusion add --help
 
 ## Project Structure
 
-Running `fusion init` creates:
+Running `fusion init` creates (Python shown; TypeScript/C# use matching extensions):
 
 ```
 <project-directory>/
 ├── core/
-│   └── settings.py          # Project settings
+│   └── settings.py          # Settings overlay (UPPERCASE keys)
 ├── src/
-│   └── modules/             # Application modules
-├── main.py                  # Entry point
-├── fusion-framework.toml    # Project configuration
+│   └── modules/
+│       └── products/
+│           └── products.py  # Sample FMA route module (+ custom HTTP route)
+├── main.py                  # Entry point (listen lives here only)
+├── requirements.txt         # fusion-framework pin (Python)
+├── pyproject.toml           # Project metadata (Python)
+├── fusion-framework.toml    # Project + tool + installed modules
 ├── fusion.dev.json          # Development environment
 ├── fusion.prod.json         # Production environment
 ├── fusion.stage.json        # Staging environment
-└── .gitignore               # Git ignore rules (language-specific)
+└── .gitignore               # Language-specific ignore rules
 ```
 
 `main` and `core/settings` follow the extension of the selected language, so a
-TypeScript project gets `main.ts` and `core/settings.ts` instead.
+TypeScript project gets `main.ts` and `core/settings.ts` instead. C# uses `main.cs`,
+`*.csproj` (`net10.0`), and `[Route]` / `[HttpGet]` attributes.
 
 `core/settings.py` reads the `config` block of `fusion.<env>.json` from the
 project root, where `<env>` comes from the `FUSION_ENV` environment variable and
@@ -286,7 +291,7 @@ needed anywhere else.
 ```json
 {
   "env": "stage",
-  "config": { "port": 1010 },
+  "config": { "port": 8081 },
   "commands": {
     "run": "docker compose up",
     "stop": "docker compose down"
@@ -294,8 +299,20 @@ needed anywhere else.
 }
 ```
 
-`config` is yours to shape and is what `core/settings` reads. `commands` holds
+`config` is yours to shape and is what `core/settings` / Fusion runtime reads. `commands` holds
 project commands that `fusion command` runs.
+
+Default scaffold ports: **dev 8080**, **stage 8081**, **prod 9090**. Each env also includes
+`fingerprint.enabled` (framework identity headers) and a `swagger` block (enabled in `dev`,
+off in `prod`/`stage`).
+
+`FusionApp` registers **framework identity headers** middleware by default
+(`framework_headers` / `frameworkHeaders` / `Middleware.FrameworkHeaders`). Extra middleware
+is optional via the generated `MIDDLEWARE` list.
+
+Generated apps pin **fusion-framework 1.2.3** (Python `requirements.txt` / `pyproject.toml`,
+Node `package.json`, C# `PackageReference` on **net10.0**). The starter route module
+demonstrates convention handlers plus a custom HTTP route (`http_get` / `httpGet` / `[HttpGet]`).
 
 New projects also get a `swagger` block under `config` (enabled in `dev`, off in
 `prod`/`stage`). Edit it to control the docs UI, OpenAPI info, auth, and navbar:
