@@ -13,19 +13,41 @@ import src.modules.products.products  # registers @route classes
 
 from fusion_framework.app import FusionApp
 from fusion_framework.config import get_settings, load_settings_module
+from fusion_framework.middleware import (
+    cache_headers,
+    cors,
+    default_builtin_middleware,
+    framework_headers,
+    request_id,
+    security_headers,
+)
 
-# Extra global middleware (optional).
-# FusionApp already registers framework_headers() (X-Powered-By / X-Framework / X-Fusion-Version).
-# Example:
-#   from fusion_framework import bearer_jwt
-#   MIDDLEWARE = [bearer_jwt()]
-MIDDLEWARE: list = []
+
+def _middleware_section(settings, name: str) -> dict:
+    block = settings.get("middleware", {}) or {}
+    if not isinstance(block, dict):
+        block = dict(block) if hasattr(block, "items") else {}
+    section = block.get(name, {}) or {}
+    return dict(section) if isinstance(section, dict) else {}
+
+
+def build_middleware(settings) -> list:
+    # Method 1: wire each built-in from fusion.<env>.json
+    return [
+        framework_headers(),
+        security_headers(_middleware_section(settings, "security")),
+        cors(_middleware_section(settings, "cors")),
+        cache_headers(_middleware_section(settings, "cache")),
+        request_id(_middleware_section(settings, "request_id")),
+    ]
+    # Method 2 (alternative): return default_builtin_middleware(settings)
 
 
 def main() -> None:
     load_settings_module("settings")
-    app = FusionApp(get_settings())
-    for middleware in MIDDLEWARE:
+    settings = get_settings()
+    app = FusionApp(settings)
+    for middleware in build_middleware(settings):
         app.use(middleware)
     app.listen()
 
@@ -98,17 +120,39 @@ const TYPESCRIPT_MAIN: &str = r#"
  */
 import "./src/modules/products/products";
 
-import { FusionApp, getSettings, settings } from "fusion-framework";
+import {
+  FusionApp,
+  cacheHeaders,
+  cors,
+  frameworkHeaders,
+  getSettings,
+  requestId,
+  securityHeaders,
+  settings,
+} from "fusion-framework";
 
-// Extra global middleware (optional).
-// FusionApp already registers frameworkHeaders() (X-Powered-By / X-Framework / X-Fusion-Version).
-// Example: import { bearerJwt } from "fusion-framework"; const MIDDLEWARE = [bearerJwt()];
-const MIDDLEWARE: Array<(req: any, next: any) => any> = [];
+function middlewareSection(name: string): Record<string, unknown> {
+  const root = settings.get("middleware", {}) as Record<string, unknown> | null;
+  const block = root?.[name];
+  return block && typeof block === "object" ? (block as Record<string, unknown>) : {};
+}
+
+function buildMiddleware() {
+  // Method 1: wire each built-in from fusion.<env>.json
+  return [
+    frameworkHeaders(),
+    securityHeaders(middlewareSection("security")),
+    cors(middlewareSection("cors")),
+    cacheHeaders(middlewareSection("cache")),
+    requestId(middlewareSection("request_id")),
+  ];
+  // Method 2 (alternative): return defaultBuiltinMiddleware()
+}
 
 async function main() {
   settings.ensureLoaded([process.cwd()]);
   const app = new FusionApp(getSettings());
-  for (const mw of MIDDLEWARE) app.use(mw);
+  for (const mw of buildMiddleware()) app.use(mw);
   await app.listen();
 }
 
@@ -180,22 +224,35 @@ export const DEBUG = settings.get("debug", false);
 const CSHARP_MAIN: &str = r#"
 // Fusion Framework entry point
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using FusionFramework;
 
-// Extra global middleware (optional).
-// FusionApp already registers Middleware.FrameworkHeaders()
-// (X-Powered-By / X-Framework / X-Fusion-Version).
-// Example: MIDDLEWARE.Add(Middleware.BearerJwt());
 static class Program
 {
-    static readonly List<FusionMiddleware> MIDDLEWARE = new();
+    static JsonObject MiddlewareSection(FusionSettings settings, string name)
+    {
+        var root = settings.Get("middleware", new { }) as JsonObject ?? new JsonObject();
+        return root[name] as JsonObject ?? new JsonObject();
+    }
+
+    static List<FusionMiddleware> BuildMiddleware(FusionSettings settings) => new()
+    {
+        // Method 1: wire each built-in from fusion.<env>.json
+        Middleware.FrameworkHeaders(),
+        BuiltinMiddleware.SecurityHeaders(MiddlewareSection(settings, "security")),
+        BuiltinMiddleware.Cors(MiddlewareSection(settings, "cors")),
+        BuiltinMiddleware.CacheHeaders(MiddlewareSection(settings, "cache")),
+        BuiltinMiddleware.RequestId(MiddlewareSection(settings, "request_id")),
+    };
+    // Method 2 (alternative): BuiltinMiddleware.FromSettings(settings)
 
     static void Main()
     {
         Route.RegisterAll(typeof(Program).Assembly);
         SettingsStore.Current.EnsureLoaded(System.IO.Directory.GetCurrentDirectory());
-        using var app = new FusionApp(SettingsStore.GetSettings());
-        foreach (var mw in MIDDLEWARE)
+        var settings = SettingsStore.GetSettings();
+        using var app = new FusionApp(settings);
+        foreach (var mw in BuildMiddleware(settings))
             app.Use(mw);
         app.Listen();
     }
@@ -452,7 +509,9 @@ mod tests {
 
         let main = fs::read_to_string(target_dir.join("main.py")).unwrap();
         assert!(main.contains("registers @route classes"));
-        assert!(main.contains("framework_headers()"));
+        assert!(main.contains("framework_headers"));
+        assert!(main.contains("security_headers"));
+        assert!(main.contains("build_middleware"));
         assert!(!main.contains("@router"));
 
         let products = fs::read_to_string(target_dir.join("src/modules/products/products.py")).unwrap();
@@ -488,7 +547,9 @@ mod tests {
         assert!(products.contains("CatalogAction"));
 
         let main = fs::read_to_string(target_dir.join("main.ts")).unwrap();
-        assert!(main.contains("frameworkHeaders()"));
+        assert!(main.contains("frameworkHeaders"));
+        assert!(main.contains("securityHeaders"));
+        assert!(main.contains("buildMiddleware"));
         assert!(!main.contains("ships with none by default"));
 
         fs::remove_dir_all(&target_dir).unwrap();
@@ -514,7 +575,9 @@ mod tests {
         assert!(products.contains("CatalogAction"));
 
         let main = fs::read_to_string(target_dir.join("main.cs")).unwrap();
-        assert!(main.contains("FrameworkHeaders()"));
+        assert!(main.contains("FrameworkHeaders"));
+        assert!(main.contains("SecurityHeaders"));
+        assert!(main.contains("BuildMiddleware"));
         assert!(!main.contains("ships with none by default"));
 
         fs::remove_dir_all(&target_dir).unwrap();
