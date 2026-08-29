@@ -314,24 +314,14 @@ fn write_language_project_files(
 ) -> Result<()> {
     match language {
         Language::Python => {
-            let requirements = format!(
-                "fusion-framework=={version}\n",
-                version = crate::setting::FUSION_FRAMEWORK_VERSION,
-            );
-            write(target_dir.join("requirements.txt").as_path(), &requirements)?;
-
             let pyproject = format!(
                 r#"[project]
 name = "{name}"
 version = "0.1.0"
 description = "Fusion Framework application"
 requires-python = ">=3.9"
-dependencies = [
-  "fusion-framework=={version}",
-]
 "#,
                 name = project_name.replace('_', "-"),
-                version = crate::setting::FUSION_FRAMEWORK_VERSION,
             );
             write(target_dir.join("pyproject.toml").as_path(), &pyproject)?;
             Ok(())
@@ -344,24 +334,11 @@ dependencies = [
   "private": true,
   "type": "module",
   "scripts": {{
-    "dev": "tsx main.ts",
-    "start": "tsx main.ts"
-  }},
-  "dependencies": {{
-    "fusion-framework": "{version}"
-  }},
-  "devDependencies": {{
-    "tsx": "^4.19.0",
-    "typescript": "^5.6.0",
-    "@types/node": "^22.0.0"
-  }},
-  "engines": {{
-    "node": ">=18"
+    "start": "node main.ts"
   }}
 }}
 "#,
                 name = project_name,
-                version = crate::setting::FUSION_FRAMEWORK_VERSION,
             );
             write(&target_dir.join("package.json"), &package_json)?;
             write(
@@ -394,14 +371,9 @@ dependencies = [
     <RootNamespace>{ns}</RootNamespace>
     <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
   </PropertyGroup>
-  <ItemGroup>
-    <!-- Prefer the published NuGet package when available. -->
-    <PackageReference Include="FusionFramework" Version="{version}" />
-  </ItemGroup>
 </Project>
 "#,
                 ns = project_name.replace('-', "_"),
-                version = crate::setting::FUSION_FRAMEWORK_VERSION,
             );
             write(
                 &target_dir.join(format!("{project_name}.csproj")),
@@ -455,7 +427,6 @@ fn report(path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::setting::FUSION_FRAMEWORK_VERSION;
 
     fn temp_dir(label: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!(
@@ -477,7 +448,6 @@ mod tests {
         assert!(target_dir.join("main.py").is_file());
         assert!(target_dir.join("core/settings.py").is_file());
         assert!(target_dir.join("src/modules/products/products.py").is_file());
-        assert!(target_dir.join("requirements.txt").is_file());
         assert!(target_dir.join("pyproject.toml").is_file());
 
         let main = fs::read_to_string(target_dir.join("main.py")).unwrap();
@@ -490,8 +460,9 @@ mod tests {
         assert!(products.contains("CatalogAction"));
         assert!(products.contains("version=\"v1\""));
 
-        let requirements = fs::read_to_string(target_dir.join("requirements.txt")).unwrap();
-        assert!(requirements.contains(&format!("fusion-framework=={FUSION_FRAMEWORK_VERSION}")));
+        let pyproject = fs::read_to_string(target_dir.join("pyproject.toml")).unwrap();
+        assert!(!pyproject.contains("dependencies"));
+        assert!(!pyproject.contains("fusion-framework"));
 
         fs::remove_dir_all(&target_dir).unwrap();
     }
@@ -508,7 +479,9 @@ mod tests {
         assert!(target_dir.join("src/modules/products/products.ts").is_file());
 
         let package = fs::read_to_string(target_dir.join("package.json")).unwrap();
-        assert!(package.contains(&format!("\"fusion-framework\": \"{FUSION_FRAMEWORK_VERSION}\"")));
+        assert!(!package.contains("dependencies"));
+        assert!(!package.contains("devDependencies"));
+        assert!(!package.contains("fusion-framework"));
 
         let products = fs::read_to_string(target_dir.join("src/modules/products/products.ts")).unwrap();
         assert!(products.contains("httpGet"));
@@ -533,7 +506,8 @@ mod tests {
 
         let csproj = fs::read_to_string(target_dir.join("my-app.csproj")).unwrap();
         assert!(csproj.contains("net10.0"));
-        assert!(csproj.contains(&format!("Version=\"{FUSION_FRAMEWORK_VERSION}\"")));
+        assert!(!csproj.contains("PackageReference"));
+        assert!(!csproj.contains("FusionFramework"));
 
         let products = fs::read_to_string(target_dir.join("src/modules/products/products.cs")).unwrap();
         assert!(products.contains("[HttpGet"));
