@@ -1,12 +1,14 @@
 pub mod add;
 pub mod exec;
 pub mod init;
+pub mod loadenv;
 pub mod module;
 pub mod update;
 
 pub use self::add::add;
 pub use self::exec::{exec, selected_env};
 pub use self::init::init;
+pub use self::loadenv::loadenv;
 pub use self::module::module_init;
 pub use self::update::update;
 
@@ -69,6 +71,34 @@ pub enum Commands {
         /// Shorthand for --env prod
         #[arg(long)]
         prod: bool,
+    },
+
+    /// Load fusion.<env>.json into environment variables
+    LoadEnv {
+        /// Environment to load
+        #[arg(
+            long,
+            short = 'e',
+            value_name = "ENV",
+            conflicts_with_all = ["dev", "stage", "prod"]
+        )]
+        env: Option<String>,
+
+        /// Shorthand for --env dev
+        #[arg(long, conflicts_with_all = ["stage", "prod"])]
+        dev: bool,
+
+        /// Shorthand for --env stage
+        #[arg(long, conflicts_with = "prod")]
+        stage: bool,
+
+        /// Shorthand for --env prod
+        #[arg(long)]
+        prod: bool,
+
+        /// Command to run with the loaded environment (after `--`)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        command: Vec<String>,
     },
 
     /// Scaffold or manage publishable Fusion modules

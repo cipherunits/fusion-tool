@@ -28,7 +28,7 @@ mod setting;
 use anyhow::Result;
 use clap::Parser;
 
-use command::{add, exec, init, module_init, selected_env, update, Commands, ModuleCommands};
+use command::{add, exec, init, loadenv, module_init, selected_env, update, Commands, ModuleCommands};
 
 fn main() -> Result<()> {
     let cli = command::Cli::parse();
@@ -60,6 +60,16 @@ fn main() -> Result<()> {
             prod,
         } => {
             exec(name, selected_env(env, dev, stage, prod))?;
+        }
+
+        Commands::LoadEnv {
+            env,
+            dev,
+            stage,
+            prod,
+            command,
+        } => {
+            loadenv(env, dev, stage, prod, command)?;
         }
 
         Commands::Module { command } => match command {
