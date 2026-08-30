@@ -14,17 +14,23 @@ import src.modules.products.products  # registers @route classes
 
 from fusion_framework.app import FusionApp
 from fusion_framework.config import get_settings, load_settings_module
-from fusion_framework.middleware import request_id,security_headers,  cache_headers, cors
+from fusion_framework.middleware import (
+    framework_headers,
+    security_headers,
+    cors,
+    cache_headers,
+    request_id,
+)
 
 
-MIDDLEWARE: list = [
+MIDDLEWARE = [
     request_id(),
     security_headers(),
     cors(),
     cache_headers(),
 
     # Other middleware
-    ]
+]
 
 
 def main() -> None:
@@ -107,10 +113,11 @@ import "./src/modules/products/products";
 
 import {
   FusionApp,
-  requestId,
+  frameworkHeaders,
   securityHeaders,
   cors,
   cacheHeaders,
+  requestId,
   getSettings,
   settings,
 } from "fusion-framework";
@@ -493,7 +500,7 @@ mod tests {
         assert!(main.contains("registers @route classes"));
         assert!(main.contains("framework_headers"));
         assert!(main.contains("security_headers"));
-        assert!(main.contains("build_middleware"));
+        assert!(main.contains("request_id"));
         assert!(!main.contains("@router"));
 
         let products = fs::read_to_string(target_dir.join("src/modules/products/products.py")).unwrap();
@@ -531,7 +538,7 @@ mod tests {
         let main = fs::read_to_string(target_dir.join("main.ts")).unwrap();
         assert!(main.contains("frameworkHeaders"));
         assert!(main.contains("securityHeaders"));
-        assert!(main.contains("buildMiddleware"));
+        assert!(main.contains("requestId"));
         assert!(!main.contains("ships with none by default"));
 
         fs::remove_dir_all(&target_dir).unwrap();
@@ -559,7 +566,7 @@ mod tests {
         let main = fs::read_to_string(target_dir.join("main.cs")).unwrap();
         assert!(main.contains("FrameworkHeaders"));
         assert!(main.contains("SecurityHeaders"));
-        assert!(main.contains("BuildMiddleware"));
+        assert!(main.contains("RequestId"));
         assert!(!main.contains("ships with none by default"));
 
         fs::remove_dir_all(&target_dir).unwrap();
