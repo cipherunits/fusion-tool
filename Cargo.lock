@@ -241,13 +241,14 @@ dependencies = [
 
 [[package]]
 name = "fusion-tool"
-version = "1.2.8"
+version = "1.2.9"
 dependencies = [
  "anyhow",
  "clap",
  "console",
  "dialoguer",
  "flate2",
+ "libc",
  "self-replace",
  "serde",
  "serde_json",
