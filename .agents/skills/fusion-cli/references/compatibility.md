@@ -2,7 +2,7 @@
 
 | Item | Framework (source of truth) | CLI must emit |
 |------|-----------------------------|---------------|
-| Package version | `1.2.3` | `FUSION_FRAMEWORK_VERSION` |
+| Package version | `1.3.0` | `FUSION_FRAMEWORK_VERSION` |
 | C# TFM | `net10.0` | csproj `TargetFramework` |
 | Default middleware | `framework_headers` on `FusionApp` | Document as already registered |
 | Custom HTTP | `http_get` / `httpGet` / `[HttpGet]` | Demo on sample products module |

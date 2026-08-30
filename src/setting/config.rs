@@ -5,7 +5,7 @@ pub const FUSION_TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Version of the framework the generated projects target.
 /// Keep in sync with fusion-framework package versions (Cargo / PyPI / npm / NuGet).
-pub const FUSION_FRAMEWORK_VERSION: &str = "1.2.3";
+pub const FUSION_FRAMEWORK_VERSION: &str = "1.3.0";
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {

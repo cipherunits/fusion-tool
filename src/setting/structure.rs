@@ -7,47 +7,30 @@ use std::path::Path;
 const PROJECT_NAME_PLACEHOLDER: &str = "__PROJECT_NAME__";
 
 const PYTHON_MAIN: &str = r#"
+
 """Entry point: register routes, middleware, and start the server."""
 
 import src.modules.products.products  # registers @route classes
 
 from fusion_framework.app import FusionApp
 from fusion_framework.config import get_settings, load_settings_module
-from fusion_framework.middleware import (
-    cache_headers,
-    cors,
-    default_builtin_middleware,
-    framework_headers,
-    request_id,
-    security_headers,
-)
+from fusion_framework.middleware import request_id,security_headers,  cache_headers, cors
 
 
-def _middleware_section(settings, name: str) -> dict:
-    block = settings.get("middleware", {}) or {}
-    if not isinstance(block, dict):
-        block = dict(block) if hasattr(block, "items") else {}
-    section = block.get(name, {}) or {}
-    return dict(section) if isinstance(section, dict) else {}
+MIDDLEWARE: list = [
+    request_id(),
+    security_headers(),
+    cors(),
+    cache_headers(),
 
-
-def build_middleware(settings) -> list:
-    # Method 1: wire each built-in from fusion.<env>.json
-    return [
-        framework_headers(),
-        security_headers(_middleware_section(settings, "security")),
-        cors(_middleware_section(settings, "cors")),
-        cache_headers(_middleware_section(settings, "cache")),
-        request_id(_middleware_section(settings, "request_id")),
+    # Other middleware
     ]
-    # Method 2 (alternative): return default_builtin_middleware(settings)
 
 
 def main() -> None:
     load_settings_module("settings")
-    settings = get_settings()
-    app = FusionApp(settings)
-    for middleware in build_middleware(settings):
+    app = FusionApp(get_settings())
+    for middleware in MIDDLEWARE:
         app.use(middleware)
     app.listen()
 
@@ -115,44 +98,41 @@ DEBUG = settings.get("debug", default=False)
 "#;
 
 const TYPESCRIPT_MAIN: &str = r#"
+
 /**
  * Entry point: register routes, middleware, and start the server.
  */
+
 import "./src/modules/products/products";
 
 import {
   FusionApp,
-  cacheHeaders,
-  cors,
-  frameworkHeaders,
-  getSettings,
   requestId,
   securityHeaders,
+  cors,
+  cacheHeaders,
+  getSettings,
   settings,
 } from "fusion-framework";
 
-function middlewareSection(name: string): Record<string, unknown> {
-  const root = settings.get("middleware", {}) as Record<string, unknown> | null;
-  const block = root?.[name];
-  return block && typeof block === "object" ? (block as Record<string, unknown>) : {};
-}
+const MIDDLEWARE = [
+  requestId(),
+  securityHeaders(),
+  cors(),
+  cacheHeaders(),
 
-function buildMiddleware() {
-  // Method 1: wire each built-in from fusion.<env>.json
-  return [
-    frameworkHeaders(),
-    securityHeaders(middlewareSection("security")),
-    cors(middlewareSection("cors")),
-    cacheHeaders(middlewareSection("cache")),
-    requestId(middlewareSection("request_id")),
-  ];
-  // Method 2 (alternative): return defaultBuiltinMiddleware()
-}
+  // Other middleware
+];
 
 async function main() {
   settings.ensureLoaded([process.cwd()]);
+
   const app = new FusionApp(getSettings());
-  for (const mw of buildMiddleware()) app.use(mw);
+
+  for (const middleware of MIDDLEWARE) {
+    app.use(middleware);
+  }
+
   await app.listen();
 }
 
@@ -160,6 +140,8 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+
 "#;
 
 const TYPESCRIPT_PRODUCTS: &str = r#"
@@ -222,41 +204,41 @@ export const DEBUG = settings.get("debug", false);
 "#;
 
 const CSHARP_MAIN: &str = r#"
+
 // Fusion Framework entry point
-using System.Collections.Generic;
-using System.Text.Json.Nodes;
 using FusionFramework;
 
 static class Program
 {
-    static JsonObject MiddlewareSection(FusionSettings settings, string name)
-    {
-        var root = settings.Get("middleware", new { }) as JsonObject ?? new JsonObject();
-        return root[name] as JsonObject ?? new JsonObject();
-    }
+    static readonly List<FusionMiddleware> MIDDLEWARE =
+    [
+        Middleware.RequestId(),
+        Middleware.SecurityHeaders(),
+        Middleware.Cors(),
+        Middleware.CacheHeaders(),
 
-    static List<FusionMiddleware> BuildMiddleware(FusionSettings settings) => new()
-    {
-        // Method 1: wire each built-in from fusion.<env>.json
-        Middleware.FrameworkHeaders(),
-        BuiltinMiddleware.SecurityHeaders(MiddlewareSection(settings, "security")),
-        BuiltinMiddleware.Cors(MiddlewareSection(settings, "cors")),
-        BuiltinMiddleware.CacheHeaders(MiddlewareSection(settings, "cache")),
-        BuiltinMiddleware.RequestId(MiddlewareSection(settings, "request_id")),
-    };
-    // Method 2 (alternative): BuiltinMiddleware.FromSettings(settings)
+        // Other middleware
+    ];
 
     static void Main()
     {
         Route.RegisterAll(typeof(Program).Assembly);
-        SettingsStore.Current.EnsureLoaded(System.IO.Directory.GetCurrentDirectory());
-        var settings = SettingsStore.GetSettings();
-        using var app = new FusionApp(settings);
-        foreach (var mw in BuildMiddleware(settings))
-            app.Use(mw);
+
+        SettingsStore.Current.EnsureLoaded(
+            System.IO.Directory.GetCurrentDirectory()
+        );
+
+        var app = new FusionApp(SettingsStore.GetSettings());
+
+        foreach (var middleware in MIDDLEWARE)
+        {
+            app.Use(middleware);
+        }
+
         app.Listen();
     }
 }
+
 "#;
 
 const CSHARP_PRODUCTS: &str = r#"
