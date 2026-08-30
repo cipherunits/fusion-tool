@@ -5,8 +5,11 @@ use crate::setting::{
 
 use anyhow::{bail, Context, Result};
 use console::{style, Term};
+use crossterm::{
+    event::{self, Event, KeyCode},
+    terminal,
+};
 use dialoguer::Input;
-use libc;
 use std::io;
 use std::{env, fs, path::PathBuf};
 
@@ -198,105 +201,30 @@ pub fn init(
     Ok(())
 }
 
-/// Navigation actions understood by the interactive language picker.
-enum Nav {
-    Up,
-    Down,
-    Confirm,
-    Number(usize),
-    Ignore,
-}
-
-/// Read one byte from `fd`, waiting up to `timeout_ms` (negative blocks forever).
-fn poll_byte(fd: i32, timeout_ms: i32) -> io::Result<Option<u8>> {
-    let mut pfd = libc::pollfd {
-        fd,
-        events: libc::POLLIN,
-        revents: 0,
-    };
-    let n = unsafe { libc::poll(&mut pfd as *mut _, 1, timeout_ms) };
-    if n <= 0 {
-        return Ok(None);
-    }
-    let mut buf = [0u8; 1];
-    let r = unsafe { libc::read(fd, buf.as_mut_ptr() as *mut _, 1) };
-    if r <= 0 {
-        Ok(None)
-    } else {
-        Ok(Some(buf[0]))
-    }
-}
-
-/// Read a single navigation key in raw mode.
-///
-/// `console` only parses the CSI arrow form (`ESC [ A/B`); many terminals emit the
-/// SS3 application-cursor form (`ESC O A/B`) which `console` returns as an opaque
-/// `UnknownEscSeq`, so `dialoguer::Select` silently ignores it and the highlight
-/// never moves. We read the raw escape sequence ourselves and accept both forms,
-/// plus `j`/`k` (vi keys) and number keys `1`–`3`.
-fn read_nav(fd: i32) -> io::Result<Nav> {
-    let first = match poll_byte(fd, -1)? {
-        Some(b) => b,
-        None => return Ok(Nav::Ignore),
-    };
-
-    match first {
-        b'\r' | b'\n' => Ok(Nav::Confirm),
-        b' ' => Ok(Nav::Confirm),
-        b'j' => Ok(Nav::Down),
-        b'k' => Ok(Nav::Up),
-        c if (b'1'..=b'3').contains(&c) => Ok(Nav::Number((c - b'1') as usize)),
-        b'\x1b' => match poll_byte(fd, 50)? {
-            Some(b'[') => match poll_byte(fd, 50)? {
-                Some(b'A') => Ok(Nav::Up),
-                Some(b'B') => Ok(Nav::Down),
-                _ => Ok(Nav::Ignore),
-            },
-            Some(b'O') => match poll_byte(fd, 50)? {
-                Some(b'A') => Ok(Nav::Up),
-                Some(b'B') => Ok(Nav::Down),
-                _ => Ok(Nav::Ignore),
-            },
-            _ => Ok(Nav::Ignore),
-        },
-        _ => Ok(Nav::Ignore),
-    }
-}
-
-/// Restores the terminal to its original mode on drop.
-struct RawModeGuard(libc::termios);
-impl Drop for RawModeGuard {
-    fn drop(&mut self) {
-        unsafe {
-            libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &self.0);
-        }
-    }
-}
-
 fn select_language() -> Result<Language> {
     const ITEMS: [&str; 3] = ["Python", "TypeScript / Node.js", "C#"];
 
-    if unsafe { libc::isatty(libc::STDIN_FILENO) } != 1 {
+    let term = Term::stdout();
+    if !term.is_term() {
         bail!(
             "Interactive language selection requires a terminal. \
              Re-run with --lang python|typescript|csharp, or run `fusion init` in an interactive terminal."
         );
     }
 
-    // Switch stdin to raw mode so arrow keys arrive immediately and unescaped.
-    let fd = libc::STDIN_FILENO;
-    let mut original: libc::termios = unsafe { std::mem::zeroed() };
-    unsafe {
-        libc::tcgetattr(fd, &mut original);
+    // Raw mode so arrow keys arrive immediately and unescaped. `crossterm` parses
+    // both CSI (`ESC [ A/B`) and SS3 application-cursor (`ESC O A/B`) sequences,
+    // which `console`/`dialoguer` ignore — that is why the highlight would not move
+    // in some terminals. Raw mode (and the cursor) are restored on drop.
+    terminal::enable_raw_mode()?;
+    struct ModeGuard;
+    impl Drop for ModeGuard {
+        fn drop(&mut self) {
+            let _ = terminal::disable_raw_mode();
+        }
     }
-    let mut raw = original;
-    unsafe {
-        libc::cfmakeraw(&mut raw);
-        libc::tcsetattr(fd, libc::TCSAFLUSH, &raw);
-    }
-    let _raw_guard = RawModeGuard(original);
+    let _mode_guard = ModeGuard;
 
-    let term = Term::stdout();
     struct CursorGuard<'a>(&'a Term);
     impl Drop for CursorGuard<'_> {
         fn drop(&mut self) {
@@ -327,23 +255,26 @@ fn select_language() -> Result<Language> {
     render(&term, sel)?;
 
     loop {
-        match read_nav(fd)? {
-            Nav::Down => {
-                if sel + 1 < ITEMS.len() {
-                    sel += 1;
+        match event::read()? {
+            Event::Key(key) => match key.code {
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if sel + 1 < ITEMS.len() {
+                        sel += 1;
+                    }
                 }
-            }
-            Nav::Up => {
-                if sel > 0 {
-                    sel -= 1;
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if sel > 0 {
+                        sel -= 1;
+                    }
                 }
-            }
-            Nav::Confirm => break,
-            Nav::Number(n) => {
-                sel = n;
-                break;
-            }
-            Nav::Ignore => {}
+                KeyCode::Enter | KeyCode::Char(' ') => break,
+                KeyCode::Char(c) if c >= '1' && c <= '3' => {
+                    sel = (c as u8 - b'1') as usize;
+                    break;
+                }
+                _ => {}
+            },
+            _ => {}
         }
 
         term.move_cursor_up(ITEMS.len())?;
