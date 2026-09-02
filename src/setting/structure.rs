@@ -14,12 +14,12 @@ import src.modules.products.products  # registers @route classes
 
 from fusion_framework.app import FusionApp
 from fusion_framework.config import get_settings, load_settings_module
-# Optional: from fusion_framework.middleware import framework_headers, bearer_jwt, require_roles
+from fusion_framework.middleware import framework_headers
 
 
 MIDDLEWARE = [
-    # framework_headers(),
-    # request_id(), security_headers(), cors(), cache_headers() — when exported by your framework version
+    framework_headers(),
+    # bearer_jwt(), require_roles("admin"),
 ]
 
 
@@ -124,12 +124,13 @@ import "./src/modules/products/products";
 
 import {
   FusionApp,
+  frameworkHeaders,
   getSettings,
 } from "fusion-framework";
 
 const MIDDLEWARE = [
-  // frameworkHeaders(),
-  // securityHeaders(), cors(), cacheHeaders(), requestId() — when available in your framework version
+  frameworkHeaders(),
+  // bearerJwt(), requireRoles("admin"),
 ];
 
 async function main() {
@@ -249,8 +250,8 @@ static class Program
 {
     static readonly List<FusionMiddleware> MIDDLEWARE =
     [
-        // Middleware.FrameworkHeaders(),
-        // BuiltinMiddleware.SecurityHeaders(), etc. — add explicitly when needed
+        Middleware.FrameworkHeaders(),
+        // Middleware.BearerJwt(), Middleware.RequireRoles("admin"),
     ];
 
     static void Main()
