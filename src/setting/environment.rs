@@ -207,6 +207,14 @@ fn environment_value(
     map.insert("host".to_string(), Value::String(host.to_string()));
     map.insert("port".to_string(), json!(port));
     map.insert("debug".to_string(), json!(debug));
+    // Dev: auto-reload on; stage/prod: off (core/settings can still override).
+    map.insert("reload".to_string(), json!(debug));
+    map.insert(
+        "templates".to_string(),
+        json!({
+            "dir": "templates"
+        }),
+    );
     map.insert(
         "fingerprint".to_string(),
         json!({
@@ -439,6 +447,8 @@ mod tests {
         let settings = env.settings();
         assert_eq!(env.env, "dev");
         assert_eq!(settings["port"], 8080);
+        assert_eq!(settings["reload"], true);
+        assert_eq!(settings["templates"]["dir"], "templates");
         assert_eq!(settings["fingerprint"]["enabled"], true);
         assert_eq!(settings["middleware"]["security"]["enabled"], true);
         assert_eq!(settings["swagger"]["enabled"], true);

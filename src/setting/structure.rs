@@ -56,6 +56,21 @@ from fusion_framework import status
 from fusion_framework.api import FusionBaseApi
 from fusion_framework.http_route import http_get
 from fusion_framework.route import route
+from fusion_framework.template import FusionBaseTemplate
+
+
+@route("/")
+class HomePage(FusionBaseTemplate):
+    """Root page rendered with Tera (templates/home/index.html)."""
+
+    template = "home/index.html"
+
+    def context(self):
+        return {
+            "title": "__PROJECT_NAME__",
+            "message": "Your Fusion app is running.",
+            "project": "__PROJECT_NAME__",
+        }
 
 
 @route(
@@ -101,6 +116,12 @@ SECRET_KEY = settings.get("secret_key")
 # Prefer reading debug from JSON; keep False as a safe default here
 DEBUG = settings.get("debug", default=False)
 
+# Auto-restart on source changes (True/False — language-native, not JSON)
+RELOAD = settings.get("reload", default=True)
+
+# Tera templates root (relative to project cwd)
+TEMPLATES_DIR = settings.get("templates.dir", default="templates")
+
 "#;
 
 const TYPESCRIPT_MAIN: &str = r#"
@@ -114,25 +135,33 @@ import "./src/modules/products/products";
 import {
   FusionApp,
   frameworkHeaders,
-  securityHeaders,
-  cors,
-  cacheHeaders,
-  requestId,
   getSettings,
-  settings,
+  // The four builtin factories below are exported at runtime by fusion-framework
+  // but are not yet declared in its TypeScript type definitions, so they need a
+  // type suppression until the package ships their types.
+  // @ts-ignore - securityHeaders is runtime-exported but untyped
+  securityHeaders,
+  // @ts-ignore - cors is runtime-exported but untyped
+  cors,
+  // @ts-ignore - cacheHeaders is runtime-exported but untyped
+  cacheHeaders,
+  // @ts-ignore - requestId is runtime-exported but untyped
+  requestId,
 } from "fusion-framework";
 
 const MIDDLEWARE = [
-  requestId(),
+  frameworkHeaders(),  // Fusion identity headers (X-Powered-By / X-Framework / X-Fusion-Version)
   securityHeaders(),
   cors(),
   cacheHeaders(),
+  requestId(),
 
   // Other middleware
 ];
 
 async function main() {
-  settings.ensureLoaded([process.cwd()]);
+  // Load fusion.<env>.json and apply core/settings overlay (RELOAD, TEMPLATES_DIR, …)
+  await import("./core/settings");
 
   const app = new FusionApp(getSettings());
 
@@ -148,7 +177,6 @@ main().catch((err) => {
   process.exit(1);
 });
 
-
 "#;
 
 const TYPESCRIPT_PRODUCTS: &str = r#"
@@ -157,7 +185,27 @@ const TYPESCRIPT_PRODUCTS: &str = r#"
 // Desktop:  https://fusion.cipherunit.xyz/en/gui
 // CLI tool: https://github.com/cipherunits/fusion-tool
 
-import { FusionBaseApi, httpGet, route, status } from "fusion-framework";
+import {
+  FusionBaseApi,
+  FusionBaseTemplate,
+  httpGet,
+  route,
+  status,
+} from "fusion-framework";
+
+class HomePage extends FusionBaseTemplate {
+  static template = "home/index.html";
+
+  context() {
+    return {
+      title: "__PROJECT_NAME__",
+      message: "Your Fusion app is running.",
+      project: "__PROJECT_NAME__",
+    };
+  }
+}
+
+route("/")(HomePage);
 
 class ProductModule extends FusionBaseApi {
   get() {
@@ -195,7 +243,7 @@ route("api/[module]/", {
   deprecated: false,
 })(ProductModule);
 
-export { ProductModule };
+export { HomePage, ProductModule };
 "#;
 
 const TYPESCRIPT_SETTINGS: &str = r#"
@@ -208,6 +256,15 @@ settings.ensureLoaded([process.cwd()]);
 
 export const SECRET_KEY = settings.get("secret_key");
 export const DEBUG = settings.get("debug", false);
+// Auto-restart on source changes (boolean — language-native)
+export const RELOAD = settings.get("reload", true) ?? true;
+// Tera templates root
+export const TEMPLATES_DIR = settings.get("templates.dir", "templates") ?? "templates";
+
+settings.merge({
+  reload: RELOAD,
+  templates: { dir: TEMPLATES_DIR },
+});
 "#;
 
 const CSHARP_MAIN: &str = r#"
@@ -219,10 +276,11 @@ static class Program
 {
     static readonly List<FusionMiddleware> MIDDLEWARE =
     [
-        Middleware.RequestId(),
-        Middleware.SecurityHeaders(),
-        Middleware.Cors(),
-        Middleware.CacheHeaders(),
+        Middleware.FrameworkHeaders(),  // Fusion identity headers (X-Powered-By / X-Framework / X-Fusion-Version)
+        BuiltinMiddleware.SecurityHeaders(),
+        BuiltinMiddleware.Cors(),
+        BuiltinMiddleware.CacheHeaders(),
+        BuiltinMiddleware.RequestId(),
 
         // Other middleware
     ];
@@ -254,9 +312,26 @@ const CSHARP_PRODUCTS: &str = r#"
 // Desktop:  https://fusion.cipherunit.xyz/en/gui
 // CLI tool: https://github.com/cipherunits/fusion-tool
 
+using System.Text.Json.Nodes;
 using FusionFramework;
 
 namespace Products;
+
+[Route("/")]
+public class HomePage : FusionBaseTemplate
+{
+    static HomePage()
+    {
+        Template = "home/index.html";
+    }
+
+    public override Dictionary<string, JsonNode?> Context() => new()
+    {
+        ["title"] = JsonValue.Create("__PROJECT_NAME__"),
+        ["message"] = JsonValue.Create("Your Fusion app is running."),
+        ["project"] = JsonValue.Create("__PROJECT_NAME__"),
+    };
+}
 
 [Route("api/[module]", Tags = new[] { "products" }, Desc = "Product resource", Version = "v1")]
 public class ProductModule : FusionBaseApi
@@ -296,11 +371,111 @@ public static class CoreSettings
 
     public static object? SecretKey => SettingsStore.Current.Get("secret_key");
     public static object? Debug => SettingsStore.Current.Get("debug", false);
+    // Auto-restart on source changes
+    public static object? Reload => SettingsStore.Current.Get("reload", true);
+    // Tera templates root
+    public static object? TemplatesDir => SettingsStore.Current.Get("templates.dir", "templates");
 }
 "#;
 
+const HOME_INDEX_HTML: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }}</title>
+  <style>{% include "home/style.css" %}</style>
+</head>
+<body>
+  <main class="page">
+    <p class="eyebrow">Fusion Framework</p>
+    <h1>{{ title }}</h1>
+    <p class="lead">{{ message }}</p>
+    <p class="meta">Project <strong>{{ project }}</strong> · powered by Tera</p>
+    <nav class="actions">
+      {{<fusion.button label="Open Swagger" href="/swagger" variant="primary" />}}
+      {{<fusion.link label="JSON context" href="/?format=json" />}}
+    </nav>
+  </main>
+</body>
+</html>
+"#;
+
+const HOME_STYLE_CSS: &str = r#"
+:root {
+  --bg: #0f1419;
+  --fg: #e7ecf3;
+  --muted: #9aa8b8;
+  --accent: #3d8bfd;
+  --card: #1a222d;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: var(--fg);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #1c3a5f 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #243049 0%, transparent 50%),
+    var(--bg);
+}
+.page {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 4.5rem 1.5rem;
+}
+.eyebrow {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: var(--accent);
+  margin: 0 0 0.75rem;
+}
+h1 {
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.75rem;
+}
+.lead {
+  font-size: 1.125rem;
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0 0 1rem;
+}
+.meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 2rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+.fusion-btn {
+  display: inline-block;
+  padding: 0.55rem 1rem;
+  border-radius: 0.4rem;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+}
+.fusion-btn--primary { background: var(--accent); color: #fff; }
+.fusion-link { color: var(--accent); text-decoration: none; }
+.fusion-link:hover { text-decoration: underline; }
+"#;
+
 /// Directories every new project starts with. `src/modules` also creates `src`.
-const DIRECTORIES: [&str; 3] = ["core", "src/modules", "src/modules/products"];
+const DIRECTORIES: [&str; 4] = [
+    "core",
+    "src/modules",
+    "src/modules/products",
+    "templates/home",
+];
 
 /// Create the starting layout of a new project:
 ///
@@ -308,10 +483,14 @@ const DIRECTORIES: [&str; 3] = ["core", "src/modules", "src/modules/products"];
 /// ├── core
 /// │   └── settings.py
 /// ├── main.py
+/// ├── templates
+/// │   └── home
+/// │       ├── index.html
+/// │       └── style.css
 /// └── src
 ///     └── modules
 ///         └── products
-///             └── products.py
+///             └── products.py   # API + HomePage (FusionBaseTemplate)
 /// ```
 pub fn create(target_dir: &Path, language: &Language, project_name: &str) -> Result<()> {
     for directory in DIRECTORIES {
@@ -346,6 +525,15 @@ pub fn create(target_dir: &Path, language: &Language, project_name: &str) -> Res
             .join("src/modules/products")
             .join(format!("products{}", extension)),
         &render(products_template, project_name),
+    )?;
+
+    write(
+        &target_dir.join("templates/home/index.html"),
+        &render(HOME_INDEX_HTML, project_name),
+    )?;
+    write(
+        &target_dir.join("templates/home/style.css"),
+        HOME_STYLE_CSS,
     )?;
 
     write_language_project_files(target_dir, language, project_name)?;
@@ -494,6 +682,8 @@ mod tests {
         assert!(target_dir.join("main.py").is_file());
         assert!(target_dir.join("core/settings.py").is_file());
         assert!(target_dir.join("src/modules/products/products.py").is_file());
+        assert!(target_dir.join("templates/home/index.html").is_file());
+        assert!(target_dir.join("templates/home/style.css").is_file());
         assert!(target_dir.join("pyproject.toml").is_file());
 
         let main = fs::read_to_string(target_dir.join("main.py")).unwrap();
@@ -507,6 +697,21 @@ mod tests {
         assert!(products.contains("http_get"));
         assert!(products.contains("CatalogAction"));
         assert!(products.contains("version=\"v1\""));
+        assert!(products.contains("FusionBaseTemplate"));
+        assert!(products.contains("HomePage"));
+        assert!(products.contains("@route(\"/\")"));
+        assert!(products.contains("home/index.html"));
+
+        let settings = fs::read_to_string(target_dir.join("core/settings.py")).unwrap();
+        assert!(settings.contains("RELOAD"));
+        assert!(settings.contains("TEMPLATES_DIR"));
+
+        let html = fs::read_to_string(target_dir.join("templates/home/index.html")).unwrap();
+        assert!(html.contains("{{ title }}"));
+        assert!(html.contains(r#"{% include "home/style.css" %}"#));
+        assert!(html.contains("fusion.button"));
+        assert!(html.contains("{{ project }}"));
+        assert!(products.contains("my-app"));
 
         let pyproject = fs::read_to_string(target_dir.join("pyproject.toml")).unwrap();
         assert!(!pyproject.contains("dependencies"));
@@ -525,6 +730,7 @@ mod tests {
         assert!(target_dir.join("package.json").is_file());
         assert!(target_dir.join("tsconfig.json").is_file());
         assert!(target_dir.join("src/modules/products/products.ts").is_file());
+        assert!(target_dir.join("templates/home/index.html").is_file());
 
         let package = fs::read_to_string(target_dir.join("package.json")).unwrap();
         assert!(!package.contains("dependencies"));
@@ -534,11 +740,21 @@ mod tests {
         let products = fs::read_to_string(target_dir.join("src/modules/products/products.ts")).unwrap();
         assert!(products.contains("httpGet"));
         assert!(products.contains("CatalogAction"));
+        assert!(products.contains("FusionBaseTemplate"));
+        assert!(products.contains("HomePage"));
+        assert!(products.contains(r#"route("/")"#));
+
+        let settings = fs::read_to_string(target_dir.join("core/settings.ts")).unwrap();
+        assert!(settings.contains("RELOAD"));
+        assert!(settings.contains("TEMPLATES_DIR"));
 
         let main = fs::read_to_string(target_dir.join("main.ts")).unwrap();
         assert!(main.contains("frameworkHeaders"));
         assert!(main.contains("securityHeaders"));
+        assert!(main.contains("cors"));
+        assert!(main.contains("cacheHeaders"));
         assert!(main.contains("requestId"));
+        assert!(!main.contains("defaultBuiltinMiddleware"));
         assert!(!main.contains("ships with none by default"));
 
         fs::remove_dir_all(&target_dir).unwrap();
@@ -553,6 +769,7 @@ mod tests {
         assert!(target_dir.join("main.cs").is_file());
         assert!(target_dir.join("my-app.csproj").is_file());
         assert!(target_dir.join("src/modules/products/products.cs").is_file());
+        assert!(target_dir.join("templates/home/index.html").is_file());
 
         let csproj = fs::read_to_string(target_dir.join("my-app.csproj")).unwrap();
         assert!(csproj.contains("net10.0"));
@@ -562,11 +779,17 @@ mod tests {
         let products = fs::read_to_string(target_dir.join("src/modules/products/products.cs")).unwrap();
         assert!(products.contains("[HttpGet"));
         assert!(products.contains("CatalogAction"));
+        assert!(products.contains("FusionBaseTemplate"));
+        assert!(products.contains("HomePage"));
+        assert!(products.contains(r#"[Route("/")]"#));
+
+        let settings = fs::read_to_string(target_dir.join("core/settings.cs")).unwrap();
+        assert!(settings.contains("Reload"));
+        assert!(settings.contains("TemplatesDir"));
 
         let main = fs::read_to_string(target_dir.join("main.cs")).unwrap();
         assert!(main.contains("FrameworkHeaders"));
-        assert!(main.contains("SecurityHeaders"));
-        assert!(main.contains("RequestId"));
+        assert!(main.contains("BuiltinMiddleware"));
         assert!(!main.contains("ships with none by default"));
 
         fs::remove_dir_all(&target_dir).unwrap();

@@ -254,21 +254,26 @@ Running `fusion init` creates (Python shown; TypeScript/C# use matching extensio
 ```
 <project-directory>/
 ├── core/
-│   └── settings.py          # Settings overlay (UPPERCASE keys)
+│   └── settings.py          # Settings overlay (RELOAD, TEMPLATES_DIR, …)
 ├── src/
 │   └── modules/
 │       └── products/
-│           └── products.py  # Sample FMA route module (+ custom HTTP route)
+│           └── products.py  # HomePage (FusionBaseTemplate) + Product API
+├── templates/
+│   └── home/
+│       ├── index.html       # Tera root page
+│       └── style.css        # Included by the page
 ├── main.py                  # Entry point (listen lives here only)
 ├── requirements.txt         # fusion-framework pin (Python)
 ├── pyproject.toml           # Project metadata (Python)
 ├── fusion-framework.toml    # Project + tool + installed modules
-├── fusion.dev.json          # Development environment
+├── fusion.dev.json          # Development environment (reload: true)
 ├── fusion.prod.json         # Production environment
 ├── fusion.stage.json        # Staging environment
 └── .gitignore               # Language-specific ignore rules
 ```
 
+After `python main.py`, open `/` for the Tera home page (JSON via `/?format=json`).
 `main` and `core/settings` follow the extension of the selected language, so a
 TypeScript project gets `main.ts` and `core/settings.ts` instead. C# uses `main.cs`,
 `*.csproj` (`net10.0`), and `[Route]` / `[HttpGet]` attributes.
