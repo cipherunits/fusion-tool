@@ -14,12 +14,21 @@ import src.modules.products.products  # registers @route classes
 
 from fusion_framework.app import FusionApp
 from fusion_framework.config import get_settings, load_settings_module
-from fusion_framework.middleware import framework_headers
+from fusion_framework.middleware import (
+    cache_headers,
+    cors,
+    framework_headers,
+    request_id,
+    security_headers,
+)
 
 
 MIDDLEWARE = [
-    framework_headers(),
-    # bearer_jwt(), require_roles("admin"),
+    request_id(),
+    cors(),
+    cache_headers(),
+    security_headers(),
+    framework_headers(), # Delete this middleware if you are in production
 ]
 
 
@@ -115,26 +124,30 @@ TEMPLATES_DIR = settings.get("templates.dir", default="templates")
 "#;
 
 const TYPESCRIPT_MAIN: &str = r#"
-
 /**
  * Entry point: register routes, middleware, and start the server.
  */
-
 import "./src/modules/products/products";
 
 import {
   FusionApp,
+  cacheHeaders,
+  cors,
   frameworkHeaders,
   getSettings,
+  requestId,
+  securityHeaders,
 } from "fusion-framework";
 
 const MIDDLEWARE = [
-  frameworkHeaders(),
-  // bearerJwt(), requireRoles("admin"),
+  requestId(),
+  cors(),
+  cacheHeaders(),
+  securityHeaders(),
+  frameworkHeaders(), // Delete this middleware if you are in production
 ];
 
 async function main() {
-  // Load fusion.<env>.json and apply core/settings overlay (RELOAD, TEMPLATES_DIR, …)
   await import("./core/settings");
 
   const app = new FusionApp(getSettings());
@@ -150,7 +163,6 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-
 "#;
 
 const TYPESCRIPT_PRODUCTS: &str = r#"
@@ -242,16 +254,19 @@ settings.merge({
 "#;
 
 const CSHARP_MAIN: &str = r#"
-
 // Fusion Framework entry point
+using System.Collections.Generic;
 using FusionFramework;
 
 static class Program
 {
     static readonly List<FusionMiddleware> MIDDLEWARE =
     [
-        Middleware.FrameworkHeaders(),
-        // Middleware.BearerJwt(), Middleware.RequireRoles("admin"),
+        BuiltinMiddleware.RequestId(),
+        BuiltinMiddleware.Cors(),
+        BuiltinMiddleware.CacheHeaders(),
+        BuiltinMiddleware.SecurityHeaders(),
+        BuiltinMiddleware.FrameworkHeaders(), // Delete this middleware if you are in production
     ];
 
     static void Main()
@@ -261,6 +276,7 @@ static class Program
         SettingsStore.Current.EnsureLoaded(
             System.IO.Directory.GetCurrentDirectory()
         );
+        _ = CoreSettings.Reload;
 
         var app = new FusionApp(SettingsStore.GetSettings());
 
@@ -272,7 +288,6 @@ static class Program
         app.Listen();
     }
 }
-
 "#;
 
 const CSHARP_PRODUCTS: &str = r#"
@@ -659,6 +674,8 @@ mod tests {
         assert!(main.contains("registers @route classes"));
         assert!(main.contains("framework_headers"));
         assert!(main.contains("security_headers"));
+        assert!(main.contains("cache_headers"));
+        assert!(main.contains("cors"));
         assert!(main.contains("request_id"));
         assert!(!main.contains("@router"));
 
@@ -718,11 +735,13 @@ mod tests {
         assert!(settings.contains("TEMPLATES_DIR"));
 
         let main = fs::read_to_string(target_dir.join("main.ts")).unwrap();
+        assert!(main.contains("requestId(),"));
+        assert!(main.find("requestId()").unwrap() < main.find("frameworkHeaders()").unwrap());
+        assert!(main.contains("Delete this middleware if you are in production"));
         assert!(main.contains("frameworkHeaders"));
         assert!(main.contains("securityHeaders"));
         assert!(main.contains("cors"));
         assert!(main.contains("cacheHeaders"));
-        assert!(main.contains("requestId"));
         assert!(!main.contains("defaultBuiltinMiddleware"));
         assert!(!main.contains("ships with none by default"));
 
@@ -757,9 +776,12 @@ mod tests {
         assert!(settings.contains("TemplatesDir"));
 
         let main = fs::read_to_string(target_dir.join("main.cs")).unwrap();
+        assert!(main.find("RequestId()").unwrap() < main.find("FrameworkHeaders()").unwrap());
+        assert!(main.contains("Delete this middleware if you are in production"));
         assert!(main.contains("FrameworkHeaders"));
-        assert!(main.contains("BuiltinMiddleware"));
-        assert!(!main.contains("ships with none by default"));
+        assert!(main.contains("BuiltinMiddleware.CacheHeaders"));
+        assert!(main.contains("BuiltinMiddleware.RequestId"));
+        assert!(main.contains("CoreSettings.Reload"));
 
         fs::remove_dir_all(&target_dir).unwrap();
     }
