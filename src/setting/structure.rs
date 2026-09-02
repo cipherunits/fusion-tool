@@ -14,22 +14,12 @@ import src.modules.products.products  # registers @route classes
 
 from fusion_framework.app import FusionApp
 from fusion_framework.config import get_settings, load_settings_module
-from fusion_framework.middleware import (
-    framework_headers,
-    security_headers,
-    cors,
-    cache_headers,
-    request_id,
-)
+# Optional: from fusion_framework.middleware import framework_headers, bearer_jwt, require_roles
 
 
 MIDDLEWARE = [
-    request_id(),
-    security_headers(),
-    cors(),
-    cache_headers(),
-
-    # Other middleware
+    # framework_headers(),
+    # request_id(), security_headers(), cors(), cache_headers() — when exported by your framework version
 ]
 
 
@@ -134,29 +124,12 @@ import "./src/modules/products/products";
 
 import {
   FusionApp,
-  frameworkHeaders,
   getSettings,
-  // The four builtin factories below are exported at runtime by fusion-framework
-  // but are not yet declared in its TypeScript type definitions, so they need a
-  // type suppression until the package ships their types.
-  // @ts-ignore - securityHeaders is runtime-exported but untyped
-  securityHeaders,
-  // @ts-ignore - cors is runtime-exported but untyped
-  cors,
-  // @ts-ignore - cacheHeaders is runtime-exported but untyped
-  cacheHeaders,
-  // @ts-ignore - requestId is runtime-exported but untyped
-  requestId,
 } from "fusion-framework";
 
 const MIDDLEWARE = [
-  frameworkHeaders(),  // Fusion identity headers (X-Powered-By / X-Framework / X-Fusion-Version)
-  securityHeaders(),
-  cors(),
-  cacheHeaders(),
-  requestId(),
-
-  // Other middleware
+  // frameworkHeaders(),
+  // securityHeaders(), cors(), cacheHeaders(), requestId() — when available in your framework version
 ];
 
 async function main() {
@@ -276,13 +249,8 @@ static class Program
 {
     static readonly List<FusionMiddleware> MIDDLEWARE =
     [
-        Middleware.FrameworkHeaders(),  // Fusion identity headers (X-Powered-By / X-Framework / X-Fusion-Version)
-        BuiltinMiddleware.SecurityHeaders(),
-        BuiltinMiddleware.Cors(),
-        BuiltinMiddleware.CacheHeaders(),
-        BuiltinMiddleware.RequestId(),
-
-        // Other middleware
+        // Middleware.FrameworkHeaders(),
+        // BuiltinMiddleware.SecurityHeaders(), etc. — add explicitly when needed
     ];
 
     static void Main()

@@ -218,7 +218,7 @@ fn environment_value(
     map.insert(
         "fingerprint".to_string(),
         json!({
-            "enabled": true
+            "enabled": debug
         }),
     );
     map.insert("middleware".to_string(), middleware_config());
