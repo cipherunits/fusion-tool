@@ -245,7 +245,15 @@ fn environment_value(
             "port": 6379,
             "username": null,
             "password": null,
-            "db": 0
+            "db": 0,
+            "max_events": 50
+        }),
+    );
+    map.insert(
+        "monitor".to_string(),
+        json!({
+            "enabled": debug,
+            "path": "/__fusion/monitor"
         }),
     );
     map.insert("middleware".to_string(), middleware_config());
@@ -517,6 +525,9 @@ mod tests {
         assert!(settings["cache"]["username"].is_null());
         assert!(settings["cache"]["password"].is_null());
         assert_eq!(settings["cache"]["db"], 0);
+        assert_eq!(settings["cache"]["max_events"], 50);
+        assert_eq!(settings["monitor"]["enabled"], true);
+        assert_eq!(settings["monitor"]["path"], "/__fusion/monitor");
         // HTTP cache-headers middleware stays under middleware.cache (separate from app cache).
         assert_eq!(settings["middleware"]["cache"]["enabled"], false);
         assert_eq!(settings["middleware"]["security"]["enabled"], true);
@@ -542,6 +553,8 @@ mod tests {
         assert_eq!(settings["swagger"]["enabled"], false);
         assert_eq!(settings["cache"]["driver"], "moka");
         assert!(settings["cache"]["default_ttl"].is_null());
+        assert_eq!(settings["monitor"]["enabled"], false);
+        assert_eq!(settings["monitor"]["path"], "/__fusion/monitor");
 
         fs::remove_dir_all(&dir).unwrap();
     }
@@ -595,6 +608,9 @@ mod tests {
         assert_eq!(settings["cache"]["host"], "127.0.0.1");
         assert_eq!(settings["cache"]["port"], 6379);
         assert!(settings["cache"]["password"].is_null());
+        assert_eq!(settings["monitor"]["enabled"], false);
+        assert_eq!(settings["monitor"]["path"], "/__fusion/monitor");
+        assert_eq!(settings["cache"]["max_events"], 50);
 
         fs::remove_dir_all(&dir).unwrap();
     }
