@@ -10,6 +10,8 @@ const PYTHON_MAIN: &str = r#"
 
 """Entry point: register routes, middleware, and start the server."""
 
+from pathlib import Path
+
 import src.modules.products.products  # registers @route classes
 
 from fusion_framework.app import FusionApp
@@ -20,23 +22,21 @@ from fusion_framework.middleware import (
     framework_headers,
     request_id,
     security_headers,
+    static_files,
 )
-
-
-MIDDLEWARE = [
-    request_id(),
-    cors(),
-    cache_headers(),
-    security_headers(),
-    framework_headers(), # Delete this middleware if you are in production
-]
 
 
 def main() -> None:
     load_settings_module("settings")
+    from core.settings import TEMPLATES_DIR
+
     app = FusionApp(get_settings())
-    for middleware in MIDDLEWARE:
-        app.use(middleware)
+    app.use(static_files(root=Path(TEMPLATES_DIR) / "home", prefix="/"))  # Delete this if you are using API
+    app.use(request_id())
+    app.use(cors())
+    app.use(cache_headers())
+    app.use(security_headers())
+    app.use(framework_headers())  # Delete this middleware if you are in production
     app.listen()
 
 
@@ -67,8 +67,16 @@ class HomePage(FusionBaseTemplate):
     def context(self):
         return {
             "title": "__PROJECT_NAME__",
-            "message": "Your Fusion app is running.",
+            "message": (
+                "Your Fusion Framework application is ready. "
+                "Start building by creating routes, templates, and business logic."
+            ),
             "project": "__PROJECT_NAME__",
+            "table_headers": ["Route", "Method"],
+            "table_rows": [
+                ["/v1/api/product", "GET"],
+                ["/swagger", "GET"],
+            ],
         }
 
 
@@ -127,6 +135,8 @@ const TYPESCRIPT_MAIN: &str = r#"
 /**
  * Entry point: register routes, middleware, and start the server.
  */
+import path from "node:path";
+
 import "./src/modules/products/products";
 
 import {
@@ -137,25 +147,21 @@ import {
   getSettings,
   requestId,
   securityHeaders,
+  staticFiles,
 } from "fusion-framework";
 
-const MIDDLEWARE = [
-  requestId(),
-  cors(),
-  cacheHeaders(),
-  securityHeaders(),
-  frameworkHeaders(), // Delete this middleware if you are in production
-];
-
 async function main() {
-  await import("./core/settings");
+  const { TEMPLATES_DIR } = await import("./core/settings");
 
   const app = new FusionApp(getSettings());
-
-  for (const middleware of MIDDLEWARE) {
-    app.use(middleware);
-  }
-
+  app.use(
+    staticFiles({ root: path.join(String(TEMPLATES_DIR), "home"), prefix: "/" }),
+  ); // Delete this if you are using API
+  app.use(requestId());
+  app.use(cors());
+  app.use(cacheHeaders());
+  app.use(securityHeaders());
+  app.use(frameworkHeaders()); // Delete this middleware if you are in production
   await app.listen();
 }
 
@@ -185,8 +191,14 @@ class HomePage extends FusionBaseTemplate {
   context() {
     return {
       title: "__PROJECT_NAME__",
-      message: "Your Fusion app is running.",
+      message:
+        "Your Fusion Framework application is ready. Start building by creating routes, templates, and business logic.",
       project: "__PROJECT_NAME__",
+      table_headers: ["Route", "Method"],
+      table_rows: [
+        ["/v1/api/product", "GET"],
+        ["/swagger", "GET"],
+      ],
     };
   }
 }
@@ -255,36 +267,30 @@ settings.merge({
 
 const CSHARP_MAIN: &str = r#"
 // Fusion Framework entry point
-using System.Collections.Generic;
+using System.IO;
 using FusionFramework;
 
 static class Program
 {
-    static readonly List<FusionMiddleware> MIDDLEWARE =
-    [
-        BuiltinMiddleware.RequestId(),
-        BuiltinMiddleware.Cors(),
-        BuiltinMiddleware.CacheHeaders(),
-        BuiltinMiddleware.SecurityHeaders(),
-        BuiltinMiddleware.FrameworkHeaders(), // Delete this middleware if you are in production
-    ];
-
     static void Main()
     {
         Route.RegisterAll(typeof(Program).Assembly);
 
         SettingsStore.Current.EnsureLoaded(
-            System.IO.Directory.GetCurrentDirectory()
+            Directory.GetCurrentDirectory()
         );
         _ = CoreSettings.Reload;
+        var templatesDir = CoreSettings.TemplatesDir?.ToString() ?? "templates";
 
         var app = new FusionApp(SettingsStore.GetSettings());
-
-        foreach (var middleware in MIDDLEWARE)
-        {
-            app.Use(middleware);
-        }
-
+        app.Use(BuiltinMiddleware.StaticFiles(
+            root: Path.Combine(templatesDir, "home"),
+            prefix: "/")); // Delete this if you are using API
+        app.Use(BuiltinMiddleware.RequestId());
+        app.Use(BuiltinMiddleware.Cors());
+        app.Use(BuiltinMiddleware.CacheHeaders());
+        app.Use(BuiltinMiddleware.SecurityHeaders());
+        app.Use(BuiltinMiddleware.FrameworkHeaders()); // Delete this middleware if you are in production
         app.Listen();
     }
 }
@@ -312,8 +318,13 @@ public class HomePage : FusionBaseTemplate
     public override Dictionary<string, JsonNode?> Context() => new()
     {
         ["title"] = JsonValue.Create("__PROJECT_NAME__"),
-        ["message"] = JsonValue.Create("Your Fusion app is running."),
+        ["message"] = JsonValue.Create(
+            "Your Fusion Framework application is ready. Start building by creating routes, templates, and business logic."),
         ["project"] = JsonValue.Create("__PROJECT_NAME__"),
+        ["table_headers"] = new JsonArray("Route", "Method"),
+        ["table_rows"] = new JsonArray(
+            new JsonArray("/v1/api/product", "GET"),
+            new JsonArray("/swagger", "GET")),
     };
 }
 
@@ -368,89 +379,169 @@ const HOME_INDEX_HTML: &str = r#"<!DOCTYPE html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }}</title>
-  <style>{% include "home/style.css" %}</style>
+  <style>
+    {% include "fusion/components.css" %}
+    {% include "home/style.css" %}
+  </style>
 </head>
 <body>
-  <main class="page">
-    <p class="eyebrow">Fusion Framework</p>
-    <h1>{{ title }}</h1>
-    <p class="lead">{{ message }}</p>
-    <p class="meta">Project <strong>{{ project }}</strong> · powered by Tera</p>
-    <nav class="actions">
-      {{<fusion.button label="Open Swagger" href="/swagger" variant="primary" />}}
-      {{<fusion.link label="JSON context" href="/?format=json" />}}
-    </nav>
+  <main class="container">
+    <div class="logo">
+      <img src="/Fusion-Framework-Transparent.png" alt="Fusion Framework" width="75" />
+    </div>
+
+    {{<fusion.badge label="Installation successful" variant="success" dot={true} />}}
+
+    <h1>
+      Welcome to <span>Fusion</span>
+    </h1>
+
+    <p class="description">
+      {{ message }}
+    </p>
+
+    {% <fusion.card title="Get started"> %}
+      <div class="code">
+        <span class="command">$</span> fusion command run
+      </div>
+    {% </fusion.card> %}
+
+    <div class="links">
+      {{<fusion.button label="Documentation" href="/swagger" variant="primary" />}}
+      {{<fusion.button label="GitHub" href="https://github.com/cipherunits/fusion-framework" variant="secondary" />}}
+    </div>
+
+    {{<fusion.table headers={table_headers} rows={table_rows} caption="Sample API routes" />}}
+
+    <div class="footer">
+      Project <strong>{{ project }}</strong> · powered by Fusion Framework
+    </div>
   </main>
 </body>
 </html>
 "#;
 
 const HOME_STYLE_CSS: &str = r#"
-:root {
-  --bg: #0f1419;
-  --fg: #e7ecf3;
-  --muted: #9aa8b8;
-  --accent: #3d8bfd;
-  --card: #1a222d;
-}
-* { box-sizing: border-box; }
-body {
+* {
+  box-sizing: border-box;
   margin: 0;
+  padding: 0;
+}
+
+body {
   min-height: 100vh;
-  font-family: "Segoe UI", system-ui, sans-serif;
-  color: var(--fg);
-  background:
-    radial-gradient(1200px 600px at 10% -10%, #1c3a5f 0%, transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, #243049 0%, transparent 50%),
-    var(--bg);
-}
-.page {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 4.5rem 1.5rem;
-}
-.eyebrow {
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  color: var(--accent);
-  margin: 0 0 0.75rem;
-}
-h1 {
-  font-size: clamp(2rem, 4vw, 2.75rem);
-  font-weight: 650;
-  letter-spacing: -0.03em;
-  margin: 0 0 0.75rem;
-}
-.lead {
-  font-size: 1.125rem;
-  color: var(--muted);
-  line-height: 1.55;
-  margin: 0 0 1rem;
-}
-.meta {
-  color: var(--muted);
-  font-size: 0.9rem;
-  margin: 0 0 2rem;
-}
-.actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
   align-items: center;
+  justify-content: center;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #f8fafc;
+  color: #0f172a;
 }
-.fusion-btn {
-  display: inline-block;
-  padding: 0.55rem 1rem;
-  border-radius: 0.4rem;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-  text-decoration: none;
+
+.container {
+  width: 100%;
+  max-width: 760px;
+  padding: 40px 24px;
+  text-align: center;
 }
-.fusion-btn--primary { background: var(--accent); color: #fff; }
-.fusion-link { color: var(--accent); text-decoration: none; }
-.fusion-link:hover { text-decoration: underline; }
+
+.logo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: #0f172a;
+  color: white;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+}
+
+.logo img {
+  display: block;
+  max-width: 48px;
+  height: auto;
+}
+
+.fusion-badge {
+  margin-bottom: 20px;
+}
+
+h1 {
+  font-size: clamp(34px, 6vw, 52px);
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+  margin-bottom: 18px;
+}
+
+h1 span {
+  color: #6366f1;
+}
+
+.description {
+  max-width: 580px;
+  margin: 0 auto;
+  color: #64748b;
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.fusion-card {
+  margin-top: 42px;
+}
+
+.code {
+  padding: 15px 17px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 9px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.code .command {
+  color: #a5b4fc;
+}
+
+.links {
+  margin-top: 28px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fusion-table-wrap {
+  margin-top: 28px;
+  text-align: left;
+}
+
+.footer {
+  margin-top: 42px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 30px 18px;
+  }
+  .fusion-card {
+    margin-top: 32px;
+  }
+  .description {
+    font-size: 15px;
+  }
+  .links {
+    flex-direction: column;
+  }
+  .fusion-btn {
+    width: 100%;
+  }
+}
 "#;
 
 /// Directories every new project starts with. `src/modules` also creates `src`.
@@ -461,6 +552,10 @@ const DIRECTORIES: [&str; 4] = [
     "templates/home",
 ];
 
+/// Default home page logo copied into `templates/home/` by `fusion init`.
+const HOME_LOGO_PNG: &[u8] =
+    include_bytes!("../../assets/Fusion-Framework-Transparent.png");
+
 /// Create the starting layout of a new project:
 ///
 /// ```text
@@ -470,7 +565,8 @@ const DIRECTORIES: [&str; 4] = [
 /// ├── templates
 /// │   └── home
 /// │       ├── index.html
-/// │       └── style.css
+/// │       ├── style.css
+/// │       └── Fusion-Framework-Transparent.png
 /// └── src
 ///     └── modules
 ///         └── products
@@ -519,6 +615,11 @@ pub fn create(target_dir: &Path, language: &Language, project_name: &str) -> Res
         &target_dir.join("templates/home/style.css"),
         HOME_STYLE_CSS,
     )?;
+
+    let logo_path = target_dir.join("templates/home/Fusion-Framework-Transparent.png");
+    fs::write(&logo_path, HOME_LOGO_PNG)
+        .with_context(|| format!("Could not create {}", logo_path.display()))?;
+    report(&logo_path);
 
     write_language_project_files(target_dir, language, project_name)?;
 
@@ -668,15 +769,22 @@ mod tests {
         assert!(target_dir.join("src/modules/products/products.py").is_file());
         assert!(target_dir.join("templates/home/index.html").is_file());
         assert!(target_dir.join("templates/home/style.css").is_file());
+        assert!(target_dir
+            .join("templates/home/Fusion-Framework-Transparent.png")
+            .is_file());
         assert!(target_dir.join("pyproject.toml").is_file());
 
         let main = fs::read_to_string(target_dir.join("main.py")).unwrap();
         assert!(main.contains("registers @route classes"));
+        assert!(main.contains("static_files"));
+        assert!(main.contains("TEMPLATES_DIR"));
+        assert!(main.contains("Delete this if you are using API"));
         assert!(main.contains("framework_headers"));
         assert!(main.contains("security_headers"));
         assert!(main.contains("cache_headers"));
         assert!(main.contains("cors"));
         assert!(main.contains("request_id"));
+        assert!(!main.contains("MIDDLEWARE"));
         assert!(!main.contains("@router"));
 
         let products = fs::read_to_string(target_dir.join("src/modules/products/products.py")).unwrap();
@@ -685,6 +793,7 @@ mod tests {
         assert!(products.contains("version=\"v1\""));
         assert!(products.contains("FusionBaseTemplate"));
         assert!(products.contains("HomePage"));
+        assert!(products.contains("table_headers"));
         assert!(products.contains("@route(\"/\")"));
         assert!(products.contains("home/index.html"));
 
@@ -694,8 +803,13 @@ mod tests {
 
         let html = fs::read_to_string(target_dir.join("templates/home/index.html")).unwrap();
         assert!(html.contains("{{ title }}"));
+        assert!(html.contains(r#"{% include "fusion/components.css" %}"#));
         assert!(html.contains(r#"{% include "home/style.css" %}"#));
+        assert!(html.contains("/Fusion-Framework-Transparent.png"));
+        assert!(html.contains("fusion.badge"));
         assert!(html.contains("fusion.button"));
+        assert!(html.contains("fusion.table"));
+        assert!(html.contains("fusion.card"));
         assert!(html.contains("{{ project }}"));
         assert!(products.contains("my-app"));
 
@@ -728,20 +842,30 @@ mod tests {
         assert!(products.contains("CatalogAction"));
         assert!(products.contains("FusionBaseTemplate"));
         assert!(products.contains("HomePage"));
+        assert!(products.contains("table_headers"));
         assert!(products.contains(r#"route("/")"#));
 
         let settings = fs::read_to_string(target_dir.join("core/settings.ts")).unwrap();
         assert!(settings.contains("RELOAD"));
         assert!(settings.contains("TEMPLATES_DIR"));
 
+        assert!(target_dir
+            .join("templates/home/Fusion-Framework-Transparent.png")
+            .is_file());
+
         let main = fs::read_to_string(target_dir.join("main.ts")).unwrap();
-        assert!(main.contains("requestId(),"));
+        assert!(main.contains("staticFiles"));
+        assert!(main.contains("TEMPLATES_DIR"));
+        assert!(main.contains("Delete this if you are using API"));
+        assert!(main.contains("requestId()"));
+        assert!(main.find("staticFiles").unwrap() < main.find("requestId()").unwrap());
         assert!(main.find("requestId()").unwrap() < main.find("frameworkHeaders()").unwrap());
         assert!(main.contains("Delete this middleware if you are in production"));
         assert!(main.contains("frameworkHeaders"));
         assert!(main.contains("securityHeaders"));
         assert!(main.contains("cors"));
         assert!(main.contains("cacheHeaders"));
+        assert!(!main.contains("MIDDLEWARE"));
         assert!(!main.contains("defaultBuiltinMiddleware"));
         assert!(!main.contains("ships with none by default"));
 
@@ -769,19 +893,29 @@ mod tests {
         assert!(products.contains("CatalogAction"));
         assert!(products.contains("FusionBaseTemplate"));
         assert!(products.contains("HomePage"));
+        assert!(products.contains("table_headers"));
         assert!(products.contains(r#"[Route("/")]"#));
 
         let settings = fs::read_to_string(target_dir.join("core/settings.cs")).unwrap();
         assert!(settings.contains("Reload"));
         assert!(settings.contains("TemplatesDir"));
 
+        assert!(target_dir
+            .join("templates/home/Fusion-Framework-Transparent.png")
+            .is_file());
+
         let main = fs::read_to_string(target_dir.join("main.cs")).unwrap();
+        assert!(main.contains("BuiltinMiddleware.StaticFiles"));
+        assert!(main.contains("TemplatesDir"));
+        assert!(main.contains("Delete this if you are using API"));
+        assert!(main.find("StaticFiles").unwrap() < main.find("RequestId()").unwrap());
         assert!(main.find("RequestId()").unwrap() < main.find("FrameworkHeaders()").unwrap());
         assert!(main.contains("Delete this middleware if you are in production"));
         assert!(main.contains("FrameworkHeaders"));
         assert!(main.contains("BuiltinMiddleware.CacheHeaders"));
         assert!(main.contains("BuiltinMiddleware.RequestId"));
         assert!(main.contains("CoreSettings.Reload"));
+        assert!(!main.contains("MIDDLEWARE"));
 
         fs::remove_dir_all(&target_dir).unwrap();
     }

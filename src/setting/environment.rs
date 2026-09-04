@@ -234,6 +234,20 @@ fn environment_value(
             "enabled": debug
         }),
     );
+    map.insert(
+        "cache".to_string(),
+        json!({
+            "driver": "moka",
+            "max_capacity": 10000,
+            "default_ttl": null,
+            "connection_string": null,
+            "host": "127.0.0.1",
+            "port": 6379,
+            "username": null,
+            "password": null,
+            "db": 0
+        }),
+    );
     map.insert("middleware".to_string(), middleware_config());
     map.insert("swagger".to_string(), swagger_config(swagger_enabled));
 
@@ -274,11 +288,11 @@ pub fn dev(target_dir: &Path, language: &config::Language) -> Result<()> {
 }
 
 pub fn prod(target_dir: &Path, language: &config::Language) -> Result<()> {
-    environment_file(target_dir, "prod", 9090, language, "HOST", false, false)
+    environment_file(target_dir, "prod", 9090, language, "0.0.0.0", false, false)
 }
 
 pub fn stage(target_dir: &Path, language: &config::Language) -> Result<()> {
-    environment_file(target_dir, "stage", 8081, language, "HOST", false, false)
+    environment_file(target_dir, "stage", 8081, language, "0.0.0.0", false, false)
 }
 
 /// Flatten JSON settings into uppercase environment variable names.
@@ -462,6 +476,8 @@ mod tests {
         let host_pos = content.find("\"host\"").unwrap();
         let port_pos = content.find("\"port\"").unwrap();
         let debug_pos = content.find("\"debug\"").unwrap();
+        let fingerprint_pos = content.find("\"fingerprint\"").unwrap();
+        let cache_pos = content.find("\"cache\"").unwrap();
         let middleware_pos = content.find("\"middleware\"").unwrap();
         let swagger_pos = content.find("\"swagger\"").unwrap();
         let commands_pos = content.find("\"commands\"").unwrap();
@@ -469,7 +485,9 @@ mod tests {
         assert!(env_pos < host_pos);
         assert!(host_pos < port_pos);
         assert!(port_pos < debug_pos);
-        assert!(debug_pos < middleware_pos);
+        assert!(debug_pos < fingerprint_pos);
+        assert!(fingerprint_pos < cache_pos);
+        assert!(cache_pos < middleware_pos);
         assert!(middleware_pos < swagger_pos);
         assert!(swagger_pos < commands_pos);
 
@@ -490,6 +508,17 @@ mod tests {
         assert_eq!(settings["reload"], true);
         assert_eq!(settings["templates"]["dir"], "templates");
         assert_eq!(settings["fingerprint"]["enabled"], true);
+        assert_eq!(settings["cache"]["driver"], "moka");
+        assert_eq!(settings["cache"]["max_capacity"], 10000);
+        assert!(settings["cache"]["default_ttl"].is_null());
+        assert!(settings["cache"]["connection_string"].is_null());
+        assert_eq!(settings["cache"]["host"], "127.0.0.1");
+        assert_eq!(settings["cache"]["port"], 6379);
+        assert!(settings["cache"]["username"].is_null());
+        assert!(settings["cache"]["password"].is_null());
+        assert_eq!(settings["cache"]["db"], 0);
+        // HTTP cache-headers middleware stays under middleware.cache (separate from app cache).
+        assert_eq!(settings["middleware"]["cache"]["enabled"], false);
         assert_eq!(settings["middleware"]["security"]["enabled"], true);
         assert_eq!(settings["swagger"]["enabled"], true);
         assert_eq!(
@@ -511,6 +540,8 @@ mod tests {
         let settings = env.settings();
         assert_eq!(settings["port"], 8081);
         assert_eq!(settings["swagger"]["enabled"], false);
+        assert_eq!(settings["cache"]["driver"], "moka");
+        assert!(settings["cache"]["default_ttl"].is_null());
 
         fs::remove_dir_all(&dir).unwrap();
     }
@@ -547,5 +578,24 @@ mod tests {
             assert!(content.contains(".fusion/"));
             fs::remove_dir_all(&dir).unwrap();
         }
+    }
+
+    #[test]
+    fn test_prod_includes_cache_defaults() {
+        let dir = std::env::temp_dir().join(format!("fusion-env-prod-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        prod(&dir, &Language::AspNetCore).unwrap();
+        let env = read(&dir, "prod").unwrap();
+        let settings = env.settings();
+        assert_eq!(settings["port"], 9090);
+        assert_eq!(settings["cache"]["driver"], "moka");
+        assert!(settings["cache"]["default_ttl"].is_null());
+        assert_eq!(settings["cache"]["host"], "127.0.0.1");
+        assert_eq!(settings["cache"]["port"], 6379);
+        assert!(settings["cache"]["password"].is_null());
+
+        fs::remove_dir_all(&dir).unwrap();
     }
 }

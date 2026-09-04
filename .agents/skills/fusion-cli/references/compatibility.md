@@ -4,9 +4,10 @@
 |------|-----------------------------|---------------|
 | Package version | `1.3.0` | `FUSION_FRAMEWORK_VERSION` |
 | C# TFM | `net10.0` | csproj `TargetFramework` |
-| Default middleware | `framework_headers` on `FusionApp` | Document as already registered |
+| Default middleware | Opt-in in scaffold `main` | Emit `static_files` + identity headers; logo under `templates/home` |
 | Custom HTTP | `http_get` / `httpGet` / `[HttpGet]` | Demo on sample products module |
 | Settings JSON | Nested `config` + top-level `commands` OK | Nested scaffold |
+| Cache | `cache.driver` default `moka` | Emit `cache` block in env JSON |
 | Fingerprint | `fingerprint.enabled` | Present in env JSON |
 | Route modules | Explicit import / `Route.Register` | Import in entry / RegisterAll |
 | Library packages | Plain imports after `fusion add` | Separate from app route modules |

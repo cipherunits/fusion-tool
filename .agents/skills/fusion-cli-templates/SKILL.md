@@ -25,3 +25,8 @@ Templates are **embedded strings** in Rust — not files under `templates/`.
 ## Placeholder
 
 `__PROJECT_NAME__` is replaced by `render()` in `structure.rs` when needed.
+
+## Binary assets
+
+Home logo PNG lives at `assets/Fusion-Framework-Transparent.png` and is embedded via `include_bytes!` in `structure.rs` (`HOME_LOGO_PNG`), then written under `templates/home/` on init.
+
