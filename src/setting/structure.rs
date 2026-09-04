@@ -60,7 +60,7 @@ from fusion_framework.template import FusionBaseTemplate
 
 @route("/")
 class HomePage(FusionBaseTemplate):
-    """Root page rendered with Tera (templates/home/index.html)."""
+    """Root page rendered (templates/home/index.html)."""
 
     template = "home/index.html"
 
@@ -126,7 +126,7 @@ DEBUG = settings.get("debug", default=False)
 # Auto-restart on source changes (True/False — language-native, not JSON)
 RELOAD = settings.get("reload", default=True)
 
-# Tera templates root (relative to project cwd)
+# templates root (relative to project cwd)
 TEMPLATES_DIR = settings.get("templates.dir", default="templates")
 
 "#;
@@ -256,7 +256,7 @@ export const SECRET_KEY = settings.get("secret_key");
 export const DEBUG = settings.get("debug", false);
 // Auto-restart on source changes (boolean — language-native)
 export const RELOAD = settings.get("reload", true) ?? true;
-// Tera templates root
+// templates root
 export const TEMPLATES_DIR = settings.get("templates.dir", "templates") ?? "templates";
 
 settings.merge({
@@ -368,7 +368,7 @@ public static class CoreSettings
     public static object? Debug => SettingsStore.Current.Get("debug", false);
     // Auto-restart on source changes
     public static object? Reload => SettingsStore.Current.Get("reload", true);
-    // Tera templates root
+    // templates root
     public static object? TemplatesDir => SettingsStore.Current.Get("templates.dir", "templates");
 }
 "#;
