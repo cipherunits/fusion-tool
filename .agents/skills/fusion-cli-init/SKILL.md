@@ -18,11 +18,14 @@ description: >-
 ## Generated app must include
 
 - Entrypoint that imports/registers one sample route module and calls `listen`
-- `core/settings` overlay
+- `core/settings` overlay (`TEMPLATES_DIR` / `TemplatesDir`)
+- Opt-in middleware chain in `main`: `static_files` / `staticFiles` / `BuiltinMiddleware.StaticFiles` serving `templates/home` at `/` (comment: delete if API-only), then `request_id`, `cors`, `cache_headers`, `security_headers`, `framework_headers`
+- Home logo `templates/home/Fusion-Framework-Transparent.png` (embedded asset) referenced from `index.html` as `/Fusion-Framework-Transparent.png`
+- Welcome page uses Fusion Tera components: `fusion.badge`, `fusion.button`, `fusion.card`, `fusion.table` + `{% include "fusion/components.css" %}`
 - `src/modules/products` route module with `[module]`, `version="v1"`, convention verbs, and one custom HTTP route (`http_get` / `httpGet` / `[HttpGet]`)
 - Nested env JSON: `config` (host/port/debug/fingerprint/swagger) + `commands.run`
 - Dependency pin to `FUSION_FRAMEWORK_VERSION`
-- Accurate comments about `framework_headers` defaults (already on `FusionApp`)
+- Accurate comment on `framework_headers` (delete in production)
 
 ## Ports
 
@@ -39,3 +42,7 @@ description: >-
 - [ ] Generated Node pins `fusion-framework` in `package.json`
 - [ ] Generated C# uses `net10.0` and NuGet pin
 - [ ] No “ships with none by default” middleware wording
+
+## Cache
+
+Env JSON includes a `cache` block; default driver is **moka** (Redis later).
